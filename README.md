@@ -2,7 +2,7 @@
 
 Code companion for: **Improved discovery and quantification of post-translational modifications in single-cell proteomics**
 
-R-based analysis of single-cell proteomics data from ALS (Amyotrophic Lateral Sclerosis) motor neurons, stratified by TDP-43 pathology severity.
+R-based re-analysis of single-cell proteomics data from ALS (Amyotrophic Lateral Sclerosis) motor neurons, original publication [here](https://doi.org/10.1016/j.celrep.2023.113636)
 
 ## Dependencies
 
@@ -32,7 +32,7 @@ R-based analysis of single-cell proteomics data from ALS (Amyotrophic Lateral Sc
 
 ## Data
 
-Input data (raw `.psmtsv` / `.tsv` files from MetaMorpheus + FlashLFQ) resides on the Kelly Lab network share:
+Input data (raw `.psmtsv` /  files from MetaMorpheus) resides on the Smith lab network, will be added to git LFS shortly.
 `\\bison.chem.wisc.edu\share\Projects\Kelly_ALS_motor_nueron_dataset\`
 
 The `QuantData/` files in this repo are the pre-processed FlashLFQ outputs used as direct inputs to the R analysis scripts. The large `QuantifiedPeptides.tsv` files are stored via Git LFS.
@@ -50,5 +50,5 @@ Run `PublicationWorkflow.R` for the primary PTM and protein-level analysis. Run 
 ## Dataset
 
 ~100 single motor neurons stratified by TDP-43 pathology severity (CTL / NON / MLD / MOD / SEV), from 5 post-mortem donors. Two parallel searches:
-- **DiversePtms**: GPTMD search allowing a broad set of PTMs
-- **LimitedPtms**: Targeted search restricted to biologically validated PTMs
+- **DiversePtms**: GPTMD+Search using the UniProt human XML allowing a broad set of PTMs
+- **LimitedPtms**: GPTMD+Search  using the UniProt human fasta restricted to 3 variable PTMs (Deamidation, pyroglutamate, oxidation of methionine) 
