@@ -1,0 +1,2 @@
+Tdp43_Stratified/QuantData/DiversePtms/QuantifiedPeptides.tsv filter=lfs diff=lfs merge=lfs -text
+Tdp43_Stratified/QuantData/LimitedPtms/QuantifiedPeptides.tsv filter=lfs diff=lfs merge=lfs -text
