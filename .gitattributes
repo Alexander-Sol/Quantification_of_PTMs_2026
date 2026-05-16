@@ -1,2 +1,8 @@
-Tdp43_Stratified/QuantData/DiversePtms/QuantifiedPeptides.tsv filter=lfs diff=lfs merge=lfs -text
-Tdp43_Stratified/QuantData/LimitedPtms/QuantifiedPeptides.tsv filter=lfs diff=lfs merge=lfs -text
+# R cached objects — large, tracked via Git LFS
+*.rds filter=lfs diff=lfs merge=lfs -text
+# Quantification data files — large, tracked via Git LFS
+Data/DiversePtms/QuantifiedPeptides.tsv filter=lfs diff=lfs merge=lfs -text
+Data/DiversePtms/QuantifiedProteins.tsv filter=lfs diff=lfs merge=lfs -text
+Data/LimitedPtms/QuantifiedPeptides.tsv filter=lfs diff=lfs merge=lfs -text
+Data/LimitedPtms/QuantifiedProteins.tsv filter=lfs diff=lfs merge=lfs -text
+Data/SequencePositionTable.tsv filter=lfs diff=lfs merge=lfs -text

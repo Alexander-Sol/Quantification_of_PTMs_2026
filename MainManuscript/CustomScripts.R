@@ -642,7 +642,7 @@ OnlyNonEnzymaticMods <- function(peptides) {
 
 GetSequencePosition <- function(base_sequence){
   if(!exists("sequencePositionTable")){
-    path <- "Tdp43_Stratified/SequencePositionTable.tsv"
+    path <- "Data/SequencePositionTable.tsv"
     sequencePositionTable <- read.csv(path, sep = '\t', row.names = NULL)
   }
   return(sequencePositionTable[sequencePositionTable$Base.Sequence == base_sequence, c("Start", "End")])
@@ -662,7 +662,7 @@ GetPositionVector <- function(base_sequence){
 
 AddPositionColumns <- function(df){
   if (!exists("sequencePositionTable")) {
-    sequencePositionTable <<- read.csv("Tdp43_Stratified/SequencePositionTable.tsv",
+    sequencePositionTable <<- read.csv("Data/SequencePositionTable.tsv",
                                        sep = '\t', row.names = NULL)
   }
   idx <- match(df$BaseSequence, sequencePositionTable$Base.Sequence)
