@@ -1,7 +1,29 @@
 {
   "permissions": {
     "allow": [
-      "Bash(wsl cat *)"
+      "Bash(wsl cat *)",
+      "Bash(Get-ChildItem C:\\\\Users\\\\Alex\\\\source\\\\repos\\\\Quantification_of_PTMs_2026\\\\Data *)",
+      "Bash(Select-String -Path \"C:\\\\Users\\\\Alex\\\\.claude\\\\projects\\\\C--Users-Alex-Source-Repos-Quantification-of-PTMs-2026\\\\*.jsonl\" -Pattern \"protein.level|differential.*protein|DE_protein|protein.*differential\" -List)",
+      "Bash(Select-Object -ExpandProperty Path)",
+      "Bash(python -c ' *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(Copy-Item *)",
+      "PowerShell(Get-Item *)",
+      "PowerShell(New-Item *)",
+      "PowerShell(Get-Content *)",
+      "Read(//c/Users/Alex/.claude/**)",
+      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\Alex\\\\Source\\\\Repos\\\\Quantification_of_PTMs_2026\\\\Data\\\\DiversePtms\\\\QuantifiedProteins.tsv\" -TotalCount 1\\) -split \"`t\" | Select-Object -First 40)",
+      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\Alex\\\\Source\\\\Repos\\\\Quantification_of_PTMs_2026\\\\Data\\\\DiversePtms\\\\QuantifiedProteins.tsv\" -TotalCount 1\\) -split \"`t\" | Measure-Object | Select-Object -ExpandProperty Count)",
+      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\Alex\\\\Source\\\\Repos\\\\Quantification_of_PTMs_2026\\\\Data\\\\LimitedPtms\\\\QuantifiedProteins.tsv\" -TotalCount 1\\) -split \"`t\" | Select-Object -First 10)",
+      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\Alex\\\\Source\\\\Repos\\\\Quantification_of_PTMs_2026\\\\Data\\\\DiversePtms\\\\QuantifiedPeptides.tsv\" -TotalCount 1\\) -split \"`t\" | Select-String \"^Intensity\")",
+      "Bash(\"/c/Users/Alex/AppData/Local/Pandoc/pandoc.exe\" \"/c/Users/Alex/AppData/Local/Temp/clean_v2_copy.docx\" -t markdown -o \"/c/Users/Alex/AppData/Local/Temp/clean_v2_extracted.md\" --wrap=none)",
+      "Read(//c/Users/Alex/AppData/Local/Temp/**)",
+      "Bash(/c/Users/Alex/AppData/Local/Pandoc/pandoc.exe *)",
+      "Read(//c/Users/Alex/AppData/Local/Pandoc/**)",
+      "Read(//c/Users/Alex/AppData/Local/Pandoc//**)",
+      "PowerShell($lines = Get-Content 'C:\\\\Users\\\\Alex\\\\Source\\\\Repos\\\\Quantification_of_PTMs_2026\\\\Data\\\\LimitedPtms\\\\QuantifiedPeptides.tsv' -TotalCount 2; $lines | ForEach-Object { \\($_.Split\\(\"`t\"\\)[0..14]\\) -join \"`t\" })",
+      "PowerShell($lines = Get-Content 'C:\\\\Users\\\\Alex\\\\Source\\\\Repos\\\\Quantification_of_PTMs_2026\\\\Data\\\\DiversePtms\\\\QuantifiedPeptides.tsv'; $genes = $lines[1..\\($lines.Length-1\\)] | ForEach-Object { $_.Split\\(\"`t\"\\)[3] }; $genes | Select-String -Pattern \"NEFL|NEFM|NEFH|EEF1|GFAP\" | Select-Object -First 20)"
     ]
   }
 }

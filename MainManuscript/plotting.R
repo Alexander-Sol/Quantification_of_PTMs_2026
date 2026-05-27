@@ -28,10 +28,14 @@ pep_long <- as.data.frame(y.peptide$E) %>%
   filter(!is.na(Log2Int)) %>%
   left_join(y.peptide$targets[, c("Sample", "Group", "Donor")], by = "Sample")
 
-p_qc_peptide <- ggplot(pep_long, aes(x = Log2Int, color = Group)) +
+pep_mean <- pep_long %>%
+  group_by(PeptideSequence, Group) %>%
+  summarise(Log2Int = mean(Log2Int), .groups = "drop")
+
+p_qc_peptide <- ggplot(pep_mean, aes(x = Log2Int, color = Group)) +
   geom_density(linewidth = 0.4, alpha = 0.7) +
   scale_color_manual(values = condition_colors) +
-  labs(x = "Log2 Peptide Intensity", y = "Density",
+  labs(x = "Mean Log2 Peptide Intensity", y = "Density",
        title = "QC: Peptide Intensity Distributions",
        color = "Condition") +
   theme_minimal() +
@@ -68,6 +72,40 @@ p_qc_protein <- ggplot(pro_long, aes(x = Log2Int, color = Group)) +
 p_qc_combined <- plot_grid(p_qc_peptide, p_qc_protein, nrow = 1, labels = c("A", "B"))
 ggsave(file.path(FIG_DIR, "QC_IntensityDistributions.png"),
        p_qc_combined, width = 12, height = 5, dpi = 300)
+
+
+# Unfiltered peptide intensity distribution (raw QuantifiedPeptides.tsv) ----
+df_raw          <- read.csv(PATH_DIVERSE, sep = "\t", row.names = NULL)
+intensity_cols  <- grep("^Intensity_", colnames(df_raw), value = TRUE)
+expr_raw        <- GetExpressionMatrix(df_raw, intensity_cols)
+targets_raw     <- GetMetaDataTdpStratified(expr_raw)
+
+pep_long_raw <- as.data.frame(expr_raw) %>%
+  rownames_to_column("PeptideSequence") %>%
+  pivot_longer(-PeptideSequence, names_to = "Sample", values_to = "Log2Int") %>%
+  filter(!is.na(Log2Int)) %>%
+  left_join(targets_raw[, c("Sample", "Group")], by = "Sample")
+
+pep_mean_raw <- pep_long_raw %>%
+  group_by(PeptideSequence, Group) %>%
+  summarise(Log2Int = mean(Log2Int), .groups = "drop")
+
+p_qc_unfiltered <- ggplot(pep_mean_raw, aes(x = Log2Int, color = Group)) +
+  geom_density(linewidth = 0.4, alpha = 0.7) +
+  scale_color_manual(values = condition_colors) +
+  labs(x = "Mean Log2 Peptide Intensity", y = "Density",
+       title = "QC: Unfiltered Peptide Intensity Distributions",
+       color = "Condition") +
+  theme_minimal() +
+  theme(
+    plot.title      = element_text(size = 13 * TEXT_SIZE),
+    axis.title      = element_text(size = 11 * TEXT_SIZE),
+    axis.text       = element_text(size = 10 * TEXT_SIZE),
+    legend.text     = element_text(size = 10 * TEXT_SIZE),
+    legend.position = "right"
+  )
+
+p_qc_unfiltered
 
 
 # ── Figure 1 | PSM & Peptide Discovery: Diverse vs Limited PTMs ──────────────
@@ -118,8 +156,8 @@ p_fig1_psm_total <- ggplot(psm_totals, aes(x = 1, y = Total, fill = Type)) +
 p_fig1_pep_per_cell <- ggplot(pep_counts_combined, aes(x = File, y = count, fill = Type)) +
   geom_bar(stat = "identity", position = "identity", alpha = 0.7) +
   scale_fill_manual(values = search_colors, guide = guide_legend(reverse = TRUE)) +
-  labs(title = "Peptides per Cell: Diverse vs. Limited PTMs",
-       x = "Sample", y = "Unique Peptide Count") +
+  labs(title = "Peptidoforms per Cell: Diverse vs. Limited PTMs",
+       x = "Sample", y = "Unique Peptidoform Count") +
   theme_minimal() +
   theme(
     axis.text.x  = element_text(angle = 90, hjust = 1, vjust = 0.5, size = 5),
@@ -142,16 +180,19 @@ p_fig1_pep_total <- ggplot(pep_totals, aes(x = 1, y = Total, fill = Type)) +
   scale_y_continuous(expand = expansion(mult = c(0, 0.18)),
                      labels = scales::comma) +
   coord_cartesian(clip = "off") +
-  labs(title = "Total\nUnique\nPeptides", x = "", y = "Unique Peptide Sequences") +
+  labs(title = "Total\nUnique\nPeptidoforms", x = "", y = "Unique Peptidoforms") +
   theme_minimal() +
   theme(
     axis.text.x  = element_blank(),
     axis.ticks.x = element_blank(),
     axis.text.y  = element_text(size = 10 * TEXT_SIZE),
     axis.title   = element_text(size = 11 * TEXT_SIZE),
-    plot.title   = element_text(size = 12 * TEXT_SIZE, hjust = 0.5),
+    plot.title   = element_text(size = 12 * TEXT_SIZE, hjust = 0.5,
+                               margin = margin(l = -40, unit = "pt")),
     legend.position = "none"
   )
+ggsave(file.path(FIG_DIR, "Fig1_Pep_Total.png"),      p_fig1_pep_total,     width = 1.5, height = 5.5,   dpi = 300)
+
 
 # Biological modifications detected ----
 p_fig1_bio_mods <- ggplot(bio_mods_df, aes(x = all_mods_renamed, y = Freq)) +
@@ -212,7 +253,6 @@ category_levels_ordered <- c("Enzymatic Mod", "Carboxymethylation",
 stringency_defs <- list(
   list(label = "All Peptides",  lfc = 0,   sig = FALSE),
   list(label = "Significant",   lfc = 0,   sig = TRUE),
-  list(label = "|logFC| ≥ 1.0", lfc = 1.0, sig = TRUE),
   list(label = "|logFC| ≥ 1.5", lfc = 1.5, sig = TRUE)
 )
 
@@ -279,7 +319,7 @@ p_fig2_bar <- ggplot(bar_df, aes(x = Group, y = percent, fill = Category)) +
     legend.title = element_blank()
   )
 
-ggsave(file.path(FIG_DIR, "Fig2_CategoryBar.png"), p_fig2_bar, width = 4, height = 5.5, dpi = 300)
+ggsave(file.path(FIG_DIR, "Fig2_CategoryBar.png"), p_fig2_bar, width = 3.5, height = 5.5, dpi = 300)
 
 
 # ── Figure 2 | Volcano + Modification Breakdown ───────────────────────────────
@@ -296,16 +336,16 @@ volcano_df <- base_filtered %>%
   mutate(
     InTop1000 = adj.P.Val <= pval_cutoff & abs(logFC) >= logFC_cutoff,
     Highlight = case_when(
-      InTop1000 & Gene %in% c("NEFH", "NEFM", "NEFL")          ~ "Neurofilaments",
-      InTop1000 & Gene == "GFAP"                                 ~ "GFAP",
-      InTop1000 & Gene %in% c("HBA1", "HBA", "HBB", "HDB")    ~ "Hemoglobin",
+      InTop1000 & Gene %in% c("NEFH", "NEFM", "NEFL")                        ~ "Neurofilaments",
+      InTop1000 & Gene == "GFAP"                                               ~ "GFAP",
+      InTop1000 & Gene %in% c("EEF1G", "EEF1B2", "EEF1D", "EEF1A1", "EEF1A2", "EEF2") ~ "Elongation Factors",
       TRUE ~ NA_character_
     ),
     y_display = -log10(adj.P.Val)
   )
 
 highlight_df <- volcano_df %>% filter(!is.na(Highlight)) %>%
-  mutate(Highlight = factor(Highlight, levels = c("GFAP", "Hemoglobin", "Neurofilaments")))
+  mutate(Highlight = factor(Highlight, levels = c("GFAP", "Elongation Factors", "Neurofilaments")))
 
 sig_y <- -log10(pval_cutoff)
 
@@ -323,7 +363,7 @@ p_fig3_volcano <- ggplot(volcano_df, aes(x = logFC, y = y_display)) +
   geom_point(data = filter(highlight_df, Highlight == "GFAP"),
              aes(fill = Category, shape = Highlight),
              size = 2.3, alpha = 0.9, stroke = 0.6, color = "black") +
-  geom_point(data = filter(highlight_df, Highlight == "Hemoglobin"),
+  geom_point(data = filter(highlight_df, Highlight == "Elongation Factors"),
              aes(fill = Category, shape = Highlight),
              size = 2.9, alpha = 0.9, stroke = 0.6, color = "black") +
   geom_point(data = filter(highlight_df, Highlight == "Neurofilaments"),
@@ -335,7 +375,7 @@ p_fig3_volcano <- ggplot(volcano_df, aes(x = logFC, y = y_display)) +
              color = "grey30", linewidth = 0.5, linetype = "dashed") +
   scale_color_manual(values = mod_colors, breaks = names(mod_colors)) +
   scale_fill_manual(values = mod_colors, guide = "none") +
-  scale_shape_manual(values = c("GFAP" = 24, "Hemoglobin" = 22, "Neurofilaments" = 23), name = NULL) +
+  scale_shape_manual(values = c("GFAP" = 24, "Elongation Factors" = 22, "Neurofilaments" = 23), name = NULL) +
   scale_y_continuous(trans   = upper_compress_trans,
                      limits  = c(0, 12.5),
                      breaks  = c(0, 1, 2, 3, 4, 5, 7, 10, 12)) +
@@ -527,32 +567,22 @@ ggsave(file.path(FIG_DIR, "Fig3_CMLProteinBar.png"), p_fig3_cml_protein, width =
 # ── Figure 4 | Protein-Level DA: Diverse vs Limited PTMs ─────────────────────
 # NOTE: Redo with fasta-database search results (task #27).
 
-modiff_colors        <- c("Shared" = "grey80", "ModDA" = "forestgreen", "NoModDA" = "darkred")
-genes_of_interest_pro  <- c("PADI2", "PRKCA", "FYN", "MBP", "GFAP", "CALM1", "MAP2K4", "CAMK1D", "SIRT2")
-genes_of_interest_comp <- c("NEFM", "DRG1", "CLASP1", "EIF3J", "MARCKSL1", "EEF1A1", "USP9X")
+modiff_colors        <- c("Shared" = "grey80", "ModDA" = "#ef5350", "NoModDA" = "#5c6bc0")
+de_status_colors     <- c("NotDE" = "grey", "UP" = "#ef5350", "DOWN" = "#ef5350")
+#highlight_fill_pro   <- "#43a047"  # green
 
-# Diverse PTM volcano ----
-highlight_pro <- table_protein_diverse %>% filter(Gene %in% genes_of_interest_pro)
-
-p_fig4_pro_volcano <- ggplot(table_protein_diverse, aes(x = logFC, y = -log10(adj.P.Val))) +
-  geom_point(aes(color = DEStatus), alpha = 0.6, size = 2, shape = 19) +
-  scale_color_manual(values = c("NotDE" = "grey", "UP" = "red", "DOWN" = "red")) +
-  geom_vline(xintercept = c(-logFC_cutoff, logFC_cutoff), linetype = "dashed", color = "black") +
-  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +
-  geom_point(data = highlight_pro, color = "darkred", size = 4, shape = 19) +
-  geom_text_repel(data = highlight_pro, aes(label = Gene),
-                  color = "black", size = 5, fontface = "bold") +
-  labs(x = "Log2 Fold Change", y = "-Log10 Adjusted P-value",
-       title = "Differentially Abundant Proteins") +
-  theme_minimal() +
-  theme(
-    plot.title      = element_text(size = 14 * TEXT_SIZE),
-    axis.title      = element_text(size = 12 * TEXT_SIZE),
-    axis.text       = element_text(size = 11 * TEXT_SIZE),
-    legend.position = "none"
-  )
-
-ggsave(file.path(FIG_DIR, "Fig4_ProteinVolcano_Diverse.png"), p_fig4_pro_volcano, width = 6, height = 5, dpi = 300)
+# PTM writers/erasers that are significantly DE in the diverse-PTM search
+genes_of_interest_pro <- c("PADI2", "SIRT2", "PRKCA", "CSNK2A1", "STUB1")
+# Proteins whose DA status differs between diverse and limited PTM analyses,
+# selected for biological relevance and high proportions of diverse-only modified peptides
+genes_of_interest_comp <- c(
+  # NoModDA: stable modified peptidoforms dilute apparent decrease in ALS
+  "NEFL", "TUBB", "MAP1B", "UCHL1",
+  # ModDA: modified peptidoforms carry the differential signal
+  "CKB", "CTSD", "PSAP", "ENO1",
+  # Mitochondrial ATP synthase (NoModDA — representative subunits)
+  "USP10", "STUB1"
+)
 
 # ModDiff volcano ----
 highlight_comp <- merged_pro %>% filter(Gene %in% genes_of_interest_comp)
@@ -560,10 +590,16 @@ highlight_comp <- merged_pro %>% filter(Gene %in% genes_of_interest_comp)
 p_fig4_moddiff <- ggplot(merged_pro, aes(x = logFC, y = -log10(adj.P.Val))) +
   geom_point(aes(color = ModDiff), alpha = 0.7, size = 2.5) +
   scale_color_manual(values = modiff_colors) +
+  scale_fill_manual(values = modiff_colors, guide = "none") +
   geom_vline(xintercept = c(-logFC_cutoff, logFC_cutoff), linetype = "dashed", color = "black") +
   geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +
+  geom_point(data = highlight_comp, aes(fill = ModDiff),
+             size = 4, shape = 21, color = "black", stroke = 0.8) +
   geom_text_repel(data = highlight_comp, aes(label = Gene),
-                  color = "black", size = 5, fontface = "bold", box.padding = 0.5) +
+                  color = "black", size = 5, fontface = "bold",
+                  box.padding = 0.5, min.segment.length = 0,
+                  max.segment.length = Inf, max.overlaps = Inf,
+                  force = 3) +
   labs(x = "Log2 Fold Change", y = "-Log10 Adjusted P-value",
        title = "Changes in Differential Abundance when\nModifications are Considered") +
   theme_minimal() +
@@ -575,18 +611,24 @@ p_fig4_moddiff <- ggplot(merged_pro, aes(x = logFC, y = -log10(adj.P.Val))) +
   )
 
 ggsave(file.path(FIG_DIR, "Fig4_ModDiff_Volcano.png"), p_fig4_moddiff, width = 6, height = 5, dpi = 300)
+ggsave(file.path(FIG_DIR, "Fig4_ModDiff_Volcano.svg"), p_fig4_moddiff, width = 6, height = 5)
 
 # logFC scatter ----
 p_fig4_scatter <- ggplot(merged_pro, aes(x = logFC, y = logFC_NoMod)) +
   geom_point(aes(color = ModDiff), alpha = 0.7, size = 2.5) +
   scale_color_manual(values = modiff_colors) +
+  scale_fill_manual(values = modiff_colors, guide = "none") +
   geom_hline(yintercept = 0, color = "grey20", linewidth = 0.5) +
   geom_vline(xintercept = 0, color = "grey20", linewidth = 0.5) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "black") +
+  geom_point(data = highlight_comp, aes(fill = ModDiff),
+             size = 4, shape = 21, color = "black", stroke = 0.8) +
   geom_text_repel(data = highlight_comp, aes(label = Gene),
                   color = "black", size = 5, fontface = "bold",
                   box.padding = 1.5, point.padding = 0.5,
-                  min.segment.length = 0, segment.color = "black") +
+                  min.segment.length = 0, segment.color = "black",
+                  max.segment.length = Inf, max.overlaps = Inf,
+                  force = 3) +
   labs(x = "Log2 Fold Change (Diverse PTMs)",
        y = "Log2 Fold Change (Limited PTMs)",
        title = "Comparison of Protein Log2FC With\nand Without Modified Peptides") +
@@ -599,6 +641,77 @@ p_fig4_scatter <- ggplot(merged_pro, aes(x = logFC, y = logFC_NoMod)) +
   )
 
 ggsave(file.path(FIG_DIR, "Fig4_LogFC_Scatter.png"), p_fig4_scatter, width = 6, height = 5, dpi = 300)
+ggsave(file.path(FIG_DIR, "Fig4_LogFC_Scatter.svg"), p_fig4_scatter, width = 6, height = 5)
+
+# Delta logFC vs delta -log10(p), colored by modified peptide count (log scale) ----
+highlight_pct_mod <- pc_for_plot %>%
+  filter(Gene %in% c(genes_of_interest_comp, "HSPD1", "HSPA8"),
+         !Gene %in% c("ATP5F1A", "ATP5F1B"))
+
+p_fig4_pct_mod_scatter <- ggplot(pc_for_plot, aes(x = LogFC_Diff, y = p_diff, color = n_mod)) +
+  geom_point(alpha = 0.8, size = 2.5) +
+  scale_color_viridis_c(trans = "log10", name = "Modified\nPeptides",
+                        limits = c(NA, 100), oob = scales::squish,
+                        breaks = c(10, 30, 100),
+                        labels = c("10", "30", "≥100")) +
+  geom_hline(yintercept = 0, color = "grey20", linewidth = 0.4) +
+  geom_vline(xintercept = 0, color = "grey20", linewidth = 0.4) +
+  geom_point(data = highlight_pct_mod,
+             size = 4, shape = 21, fill = NA, color = "black", stroke = 0.8) +
+  geom_text_repel(data = highlight_pct_mod, aes(label = Gene),
+                  color = "black", size = 5, fontface = "bold",
+                  box.padding = 0.5, min.segment.length = 0,
+                  max.overlaps = Inf, force = 3) +
+  labs(x = "Log2 FC Difference (Diverse − Limited)",
+       y = "-Log10 Adj. P-value Difference (Diverse - Limited)",
+       title = "Changes in Differential Abundance when\nModifications are Considered") +
+  theme_minimal() +
+  theme(
+    plot.title      = element_text(size = 14 * TEXT_SIZE),
+    axis.title      = element_text(size = 12 * TEXT_SIZE),
+    axis.text       = element_text(size = 11 * TEXT_SIZE),
+    legend.position = "right",
+    legend.text     = element_text(size = 10 * TEXT_SIZE),
+    legend.title    = element_text(size = 11 * TEXT_SIZE)
+  )
+
+ggsave(file.path(FIG_DIR, "Fig4_PctMod_vs_Discordance.png"), p_fig4_pct_mod_scatter, width = 6.5, height = 5, dpi = 300)
+ggsave(file.path(FIG_DIR, "Fig4_PctMod_vs_Discordance.svg"), p_fig4_pct_mod_scatter, width = 6.5, height = 5)
+
+# Limited PTM volcano, colored by ModDiff ----
+highlight_limited <- merged_pro %>% filter(Gene %in% highlight_pct_mod$Gene)
+
+p_fig4_limited_volcano <- ggplot(merged_pro,
+    aes(x = logFC_NoMod, y = -log10(adj.P.Val_NoMod), color = ModDiff)) +
+  geom_point(alpha = 0.8, size = 2.5) +
+  scale_color_manual(values = modiff_colors) +
+  scale_fill_manual(values = modiff_colors, guide = "none") +
+  geom_vline(xintercept = c(-logFC_cutoff, logFC_cutoff),
+             linetype = "dashed", color = "grey30", linewidth = 0.5) +
+  geom_hline(yintercept = -log10(pval_cutoff),
+             linetype = "dashed", color = "grey30", linewidth = 0.5) +
+  geom_point(data = highlight_limited,
+             aes(x = logFC_NoMod, y = -log10(adj.P.Val_NoMod), fill = ModDiff),
+             size = 4, shape = 21, color = "black", stroke = 0.8) +
+  geom_text_repel(data = highlight_limited,
+                  aes(x = logFC_NoMod, y = -log10(adj.P.Val_NoMod), label = Gene),
+                  color = "black", size = 5, fontface = "bold",
+                  box.padding = 0.5, min.segment.length = 0,
+                  max.overlaps = Inf, force = 3) +
+  labs(x = "Log2 Fold Change (Limited PTMs)",
+       y = "-Log10 Adjusted P-value (Limited PTMs)",
+       title = "Protein Differential Abundance\n(Limited PTM Analysis)") +
+  theme_minimal() +
+  theme(
+    plot.title      = element_text(size = 14 * TEXT_SIZE),
+    axis.title      = element_text(size = 12 * TEXT_SIZE),
+    axis.text       = element_text(size = 11 * TEXT_SIZE),
+    legend.position = "none"
+  )
+
+ggsave(file.path(FIG_DIR, "Fig4_LimitedVolcano_NMod.png"), p_fig4_limited_volcano, width = 6.5, height = 5, dpi = 300)
+ggsave(file.path(FIG_DIR, "Fig4_LimitedVolcano_NMod.svg"), p_fig4_limited_volcano, width = 6.5, height = 5)
+
 
 # Venn diagram ----
 fit_euler <- euler(list("Diverse PTMs" = diverse_de_genes,
@@ -606,11 +719,36 @@ fit_euler <- euler(list("Diverse PTMs" = diverse_de_genes,
 
 p_fig4_venn <- plot(fit_euler,
                     quantities = list(cex = 1.3),
-                    labels     = list(cex = 1.1),
-                    fills      = list(fill = c("#00bcd4", "#cddc39"), alpha = 0.45),
+                    labels     = list(cex = 1.1, box = list(col = NA, fill = alpha("white", 0.6))),
+                    fills      = list(fill = c("#ef5350", "#5c6bc0"), alpha = 0.45),
                     edges      = list(col = "grey20", lwd = 1.5),
-                    main       = "DE Proteins: Diverse vs. Limited PTMs")
+                    main       = list(label = "DE Proteins: Diverse vs. Limited PTMs",
+                                     just = "left", x = grid::unit(0.02, "npc")))
 
 png(file.path(FIG_DIR, "Fig4_Venn.png"), width = 5, height = 4, units = "in", res = 300)
 print(p_fig4_venn)
 dev.off()
+
+# Venn diagram — proteins with >= 2 modified peptides ----
+genes_with_2mods <- n_mod_strict %>% filter(n_mod >= 1) %>% pull(Gene)
+
+fit_euler_mod <- euler(list(
+  "Diverse PTMs" = intersect(diverse_de_genes, genes_with_2mods),
+  "Limited PTMs" = intersect(limited_de_genes, genes_with_2mods)
+))
+
+p_fig4_venn_mod <- plot(fit_euler_mod,
+                        quantities = list(cex = 1.3),
+                        labels     = list(cex = 1.1, box = list(col = NA, fill = alpha("white", 0.6))),
+                        fills      = list(fill = c("#ef5350", "#5c6bc0"), alpha = 0.45),
+                        edges      = list(col = "grey20", lwd = 1.5),
+                        main       = list(label = "DE Proteins: Diverse vs. Limited PTMs\n(≥1 Modified Peptides)",
+                                         just = "left", x = grid::unit(0.02, "npc")))
+
+png(file.path(FIG_DIR, "Fig4_Venn_2ModPep.png"), width = 4.5, height = 3.5, units = "in", res = 300)
+grid::grid.newpage()
+grid::pushViewport(grid::viewport(y = 0, height = 0.88, just = "bottom"))
+grid::grid.draw(p_fig4_venn_mod)
+grid::popViewport()
+dev.off()
+

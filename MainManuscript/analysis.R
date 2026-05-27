@@ -10,6 +10,7 @@ library(tidyverse)
 library(limpa)
 library(limma)
 
+setwd("C:/Users/Alex/Source/Repos/Quantification_of_PTMs_2026")
 source("MainManuscript/CustomScripts.R")
 
 # ── Data Paths ────────────────────────────────────────────────────────────────
@@ -309,6 +310,14 @@ label_de <- function(tbl) {
 }
 table_protein_diverse <- label_de(table_protein_diverse)
 
+de_proteins <- table_protein_diverse %>%
+  filter(DEStatus != "NotDE") %>%
+  select(Gene, ProteinGroup, logFC, AveExpr, adj.P.Val, DEStatus, NPeptides) %>%
+  arrange(desc(abs(logFC)))
+
+write.table(de_proteins, "Data/DE_proteins.tsv", sep = "\t", row.names = FALSE, quote = FALSE)
+message(sprintf("Wrote %d DE proteins to Data/DE_proteins.tsv", nrow(de_proteins)))
+
 
 # ── Figure 4 | Protein-Level DA: Limited PTMs ────────────────────────────────
 limited_cache_files <- c(RDS_LIM_PEPTIDE, RDS_LIM_DPCFIT, RDS_LIM_PROTEIN)
@@ -382,3 +391,36 @@ merged_pro <- merge(
     )
   ) %>%
   arrange(desc(ModDiff))
+
+mod_discordant <- merged_pro %>%
+  filter(ModDiff != "Shared") %>%
+  select(Gene, ProteinGroup, logFC, adj.P.Val, DEStatus,
+         logFC_NoMod, adj.P.Val_NoMod, LogFC_Diff, ModDiff, NPeptides) %>%
+  arrange(ModDiff, desc(abs(LogFC_Diff)))
+
+write.table(mod_discordant, "Data/ModDiscordant_proteins.tsv", sep = "\t", row.names = FALSE, quote = FALSE)
+message(sprintf("Wrote %d mod-discordant proteins to Data/ModDiscordant_proteins.tsv", nrow(mod_discordant)))
+
+discordant_category_summary <- function(mod_discordant, table_occ, min_peptides = 20) {
+  target_proteins <- mod_discordant %>%
+    filter(NPeptides > min_peptides) %>%
+    pull(ProteinGroup)
+
+  table_occ %>%
+    filter(ProteinGroup %in% target_proteins) %>%
+    group_by(Gene, Category) %>%
+    summarise(NPeptides = n(), .groups = "drop") %>%
+    pivot_wider(names_from = Category, values_from = NPeptides, values_fill = 0) %>%
+    arrange(Gene)
+}
+
+discordant_cats <- discordant_category_summary(mod_discordant, table_occ)
+
+mod_discordant$p.diff <- -1*log10(mod_discordant$adj.P.Val) - -1*log10(mod_discordant$adj.P.Val_NoMod)
+test <- merge(mod_discordant, discordant_cats, by = "Gene")
+write.table(test, "Data/ModDiscordant_withCat_breakdown.tsv", sep = "\t", row.names = FALSE, quote = FALSE)
+
+
+protein_cats <- discordant_category_summary(table_protein_diverse, table_occ, min_peptides = 20)
+protein_cats$pct_mod <-  (protein_cats$`Enzymatic Mod` + protein_cats$`Non-Enzymatic Mod` + protein_cats$Carboxymethylation) /
+ (protein_cats$Unmodified + protein_cats$Carbamidomethylation +protein_cats$`Enzymatic Mod` + protein_cats$`Non-Enzymatic Mod` + protein_cats$Carboxymethylation)

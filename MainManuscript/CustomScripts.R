@@ -528,6 +528,26 @@ AllCarboxymethyl<- function(modstring)
   }
 }
 
+# Returns TRUE if a single raw mod string (from GetMods) is present in a
+# limited-PTM search: Carbamidomethyl on Cys (fixed), Oxidation on Met
+# (variable), or Deamidation on Asn/Gln (variable).
+# Must operate on raw strings BEFORE .replaceMods, which collapses residue info
+# (e.g. "Hydroxylation on N" and "Oxidation on M" both become "Oxidation").
+.isLimitedSearchRawMod <- function(m) {
+  grepl("xidation on M$", m) ||
+    (grepl("[Dd]eamidat", m) && grepl(" on [NQ]$", m)) ||
+    m == "Carbamidomethyl on C"
+}
+
+# Returns a logical vector the same length as raw_mods_list (named list from
+# GetMods()): TRUE if every modification in that peptide is limited-search
+# compatible. Unmodified peptides (empty mod vector) return FALSE.
+IsLimitedSearchPeptide <- function(raw_mods_list) {
+  sapply(raw_mods_list, function(mods) {
+    length(mods) > 0 && all(vapply(mods, .isLimitedSearchRawMod, logical(1)))
+  })
+}
+
 ClassifyPeptideModsSpecificPrivilegeCarboxymethyl <- function(replacedMods)
 {
   classifications <- sapply(replacedMods, function(x) {
