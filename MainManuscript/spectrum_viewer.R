@@ -243,4 +243,4 @@ plot_annotated_psm <- function(full_sequence,
 
 # ── Example usage ─────────────────────────────────────────────────────────────
 
-plot_annotated_psm("ATAPQTQHVS[UniProt:Phosphoserine on S]PM[Common Variable:Oxidation on M]R")
+plot_annotated_psm("GKS[UniProt:Phosphoserine on S]PVPKS[UniProt:Phosphoserine on S]PVEEK")

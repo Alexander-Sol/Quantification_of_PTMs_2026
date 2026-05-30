@@ -548,6 +548,19 @@ IsLimitedSearchPeptide <- function(raw_mods_list) {
   })
 }
 
+# Classify a vector of full peptide sequences into:
+#   Unmodified / Enzymatic Mod / Carbamidomethylation / Carboxymethylation /
+#   Limited-Search Mod / Non-Enzymatic Mod
+# "Limited-Search Mod" is applied when ClassifyPeptideModsSpecific returns
+# "Non-Enzymatic Mod" but every modification is limited-search compatible
+# (Carbamidomethyl on C, Oxidation on M, Deamidation on N/Q).
+ClassifyPeptides <- function(peptide_sequences) {
+  all_mod  <- GetModsTextWReplacement(peptide_sequences, all_mods = TRUE) %>% sapply(paste)
+  category <- ClassifyPeptideModsSpecific(all_mod)
+  is_limited <- IsLimitedSearchPeptide(GetMods(peptide_sequences))
+  ifelse(category == "Non-Enzymatic Mod" & is_limited, "Limited-Search Mod", category)
+}
+
 ClassifyPeptideModsSpecificPrivilegeCarboxymethyl <- function(replacedMods)
 {
   classifications <- sapply(replacedMods, function(x) {

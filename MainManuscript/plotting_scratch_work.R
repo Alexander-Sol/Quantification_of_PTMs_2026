@@ -18,11 +18,33 @@ genes_of_interest_comp <- c(
   "USP10", "STUB1"
 )
 
+# Restrict all protein-level plots to proteins with ≥1 diverse-PTM-specific modification
+pep_classified <- y.peptide$genes %>%
+  mutate(
+    AllMod   = GetModsTextWReplacement(PeptideSequence, all_mods = TRUE) %>% sapply(paste),
+    Category = ClassifyPeptideModsSpecific(AllMod),
+    Category = ifelse(
+      Category == "Non-Enzymatic Mod" &
+        IsLimitedSearchPeptide(GetMods(PeptideSequence)),
+      "Limited-Search Mod",
+      Category
+    )
+  )
+
+n_mod_strict <- pep_classified %>%
+  filter(Category %in% c("Enzymatic Mod", "Carboxymethylation", "Non-Enzymatic Mod")) %>%
+  group_by(Gene) %>%
+  summarise(n_mod = n(), .groups = "drop")
+
+genes_with_diverse_mods <- n_mod_strict %>% filter(n_mod >= 1) %>% pull(Gene)
+merged_pro_filt          <- merged_pro         %>% filter(Gene %in% genes_with_diverse_mods)
+table_pro_diverse_filt   <- table_protein_diverse %>% filter(Gene %in% genes_with_diverse_mods)
+
 
 # ModDiff volcano ----
-highlight_comp <- merged_pro %>% filter(Gene %in% genes_of_interest_comp)
+highlight_comp <- merged_pro_filt %>% filter(Gene %in% genes_of_interest_comp)
 
-p_fig4_moddiff <- ggplot(merged_pro, aes(x = logFC, y = -log10(adj.P.Val))) +
+p_fig4_moddiff <- ggplot(merged_pro_filt, aes(x = logFC, y = -log10(adj.P.Val))) +
   geom_point(aes(color = ModDiff), alpha = 0.7, size = 2.5) +
   scale_color_manual(values = modiff_colors) +
   scale_fill_manual(values = modiff_colors, guide = "none") +
@@ -49,7 +71,7 @@ ggsave(file.path(FIG_DIR, "Fig4_ModDiff_Volcano.png"), p_fig4_moddiff, width = 6
 ggsave(file.path(FIG_DIR, "Fig4_ModDiff_Volcano.svg"), p_fig4_moddiff, width = 6, height = 5)
 
 # logFC scatter ----
-p_fig4_scatter <- ggplot(merged_pro, aes(x = logFC, y = logFC_NoMod)) +
+p_fig4_scatter <- ggplot(merged_pro_filt, aes(x = logFC, y = logFC_NoMod)) +
   geom_point(aes(color = ModDiff), alpha = 0.7, size = 2.5) +
   scale_color_manual(values = modiff_colors) +
   scale_fill_manual(values = modiff_colors, guide = "none") +
@@ -79,40 +101,16 @@ ggsave(file.path(FIG_DIR, "Fig4_LogFC_Scatter.png"), p_fig4_scatter, width = 6, 
 ggsave(file.path(FIG_DIR, "Fig4_LogFC_Scatter.svg"), p_fig4_scatter, width = 6, height = 5)
 
 # Modified peptide count vs logFC difference ----
-# Classify all peptides in y.peptide$genes by mod category (not table_occ, which
-# is restricted to proteins with ≥4 peptides). A new "Limited-Search Mod" category
-# captures peptides whose only modifications are Oxidation on M or Deamidation on
-# N/Q (detectable in a limited-PTM search); these are excluded from n_mod_strict.
-# IsLimitedSearchPeptide checks raw mod strings from GetMods() before text
-# replacement, which is required because .replaceMods collapses residue info
-# (e.g. "Hydroxylation on N" and "Oxidation on M" both become "Oxidation").
-
-pep_classified <- y.peptide$genes %>%
-  mutate(
-    AllMod   = GetModsTextWReplacement(PeptideSequence, all_mods = TRUE) %>% sapply(paste),
-    Category = ClassifyPeptideModsSpecific(AllMod),
-    Category = ifelse(
-      Category == "Non-Enzymatic Mod" &
-        IsLimitedSearchPeptide(GetMods(PeptideSequence)),
-      "Limited-Search Mod",
-      Category
-    )
-  )
-
-n_mod_strict <- pep_classified %>%
-  filter(Category %in% c("Enzymatic Mod", "Carboxymethylation", "Non-Enzymatic Mod")) %>%
-  group_by(Gene) %>%
-  summarise(n_mod = n(), .groups = "drop")
 nrow(n_mod_strict)
 sum(n_mod_strict$n_mod >= 2)
 
 pc_for_plot <- protein_cats %>%
   inner_join(n_mod_strict, by = "Gene") %>%
   inner_join(
-    merged_pro[, c("Gene", "LogFC_Diff", "ModDiff", "adj.P.Val", "adj.P.Val_NoMod", "logFC_NoMod")],
+    merged_pro_filt[, c("Gene", "LogFC_Diff", "ModDiff", "adj.P.Val", "adj.P.Val_NoMod", "logFC_NoMod")],
     by = "Gene"
   ) %>%
-  filter(n_mod > 5, n_mod < 2000) %>%
+  filter(n_mod >= 1) %>%
   mutate(p_diff = -log10(adj.P.Val) - (-log10(adj.P.Val_NoMod)))
 
 highlight_nmod <- pc_for_plot %>% filter(Gene %in% genes_of_interest_comp)
@@ -193,9 +191,9 @@ ggsave(file.path(FIG_DIR, "Fig4_PctMod_vs_Discordance.png"), p_fig4_pct_mod_scat
 ggsave(file.path(FIG_DIR, "Fig4_PctMod_vs_Discordance.svg"), p_fig4_pct_mod_scatter, width = 6.5, height = 5)
 
 # Limited PTM volcano, colored by ModDiff ----
-highlight_limited <- merged_pro %>% filter(Gene %in% highlight_pct_mod$Gene)
+highlight_limited <- merged_pro_filt %>% filter(Gene %in% highlight_pct_mod$Gene)
 
-p_fig4_limited_volcano <- ggplot(merged_pro,
+p_fig4_limited_volcano <- ggplot(merged_pro_filt,
                                  aes(x = logFC_NoMod, y = -log10(adj.P.Val_NoMod), color = ModDiff)) +
   geom_point(alpha = 0.8, size = 2.5) +
   scale_color_manual(values = modiff_colors) +
@@ -228,22 +226,24 @@ ggsave(file.path(FIG_DIR, "Fig4_LimitedVolcano_NMod.svg"), p_fig4_limited_volcan
 
 
 # Venn diagram ----
-fit_euler <- euler(list("Diverse PTMs" = diverse_de_genes,
-                        "Limited PTMs" = limited_de_genes))
+fit_euler <- euler(list(
+  "Diverse PTMs" = intersect(diverse_de_genes, genes_with_diverse_mods),
+  "Limited PTMs" = intersect(limited_de_genes, genes_with_diverse_mods)
+))
 
 p_fig4_venn <- plot(fit_euler,
                     quantities = list(cex = 1.3),
                     labels     = list(cex = 1.1, box = list(col = NA, fill = alpha("white", 0.6))),
                     fills      = list(fill = c("#ef5350", "#5c6bc0"), alpha = 0.45),
                     edges      = list(col = "grey20", lwd = 1.5),
-                    main       = "DE Proteins: Diverse vs. Limited PTMs\n(All Proteins)")
+                    main       = "DA Proteins: Diverse vs. Limited PTMs\n(≥1 Diverse-Specific Mod)")
 
 png(file.path(FIG_DIR, "Fig4_Venn.png"), width = 5, height = 4, units = "in", res = 300)
 print(p_fig4_venn)
 dev.off()
 
 # Venn diagram — proteins with >= 2 modified peptides ----
-genes_with_2mods <- n_mod_strict %>% filter(n_mod >= 1) %>% pull(Gene)
+genes_with_2mods <- n_mod_strict %>% filter(n_mod >= 2) %>% pull(Gene)
 
 fit_euler_mod <- euler(list(
   "Diverse PTMs" = intersect(diverse_de_genes, genes_with_2mods),
@@ -287,9 +287,9 @@ als_samples_lim  <- y.protein.lim$targets$Sample[y.protein.lim$targets$Group  ==
 ctrl_samples_div <- y.protein.filt$targets$Sample[y.protein.filt$targets$Group == "CTRL"]
 ctrl_samples_lim <- y.protein.lim$targets$Sample[y.protein.lim$targets$Group  == "CTRL"]
 
-int_all  <- build_int_df(NULL,            NULL)
-int_als  <- build_int_df(als_samples_div,  als_samples_lim)
-int_ctrl <- build_int_df(ctrl_samples_div, ctrl_samples_lim)
+int_all  <- build_int_df(NULL,             NULL)             %>% filter(Gene %in% genes_with_diverse_mods)
+int_als  <- build_int_df(als_samples_div,  als_samples_lim)  %>% filter(Gene %in% genes_with_diverse_mods)
+int_ctrl <- build_int_df(ctrl_samples_div, ctrl_samples_lim) %>% filter(Gene %in% genes_with_diverse_mods)
 
 int_nmod_scale <- scale_color_viridis_c(trans = "log10", name = "Modified\nPeptides",
                                         limits = c(NA, 100), oob = scales::squish,
@@ -346,9 +346,10 @@ read_protein_tsv <- function(protein_path, peptide_path) {
   pep_int_cols <- grep("^Intensity_", pep_header, value = TRUE)
   pro_int_idx  <- grep("^Intensity_Default_", colnames(pro))
   colnames(pro)[pro_int_idx] <- pep_int_cols
-  pro %>%
-    rename(ProteinGroup = `Protein Groups`, Gene = `Gene Name`) %>%
-    filter(grepl("Homo sapiens", Organism))
+  # Rename by pattern to avoid BOM or other invisible-character issues in column names
+  names(pro)[grep("Protein.*Group", names(pro), ignore.case = TRUE)[1]] <- "ProteinGroup"
+  names(pro)[grep("Gene.*Name",     names(pro), ignore.case = TRUE)[1]] <- "Gene"
+  pro %>% filter(grepl("Homo sapiens", Organism))
 }
 
 mean_int_from_tsv <- function(pro_df, sample_names) {
@@ -379,11 +380,11 @@ targets_div <- y.protein.filt$targets
 targets_lim <- y.protein.lim$targets
 
 int_tsv_all  <- build_int_tsv_df(targets_div$Sample,
-                                 targets_lim$Sample)
+                                 targets_lim$Sample)                              %>% filter(Gene %in% genes_with_diverse_mods)
 int_tsv_als  <- build_int_tsv_df(targets_div$Sample[targets_div$Group == "ALS"],
-                                 targets_lim$Sample[targets_lim$Group == "ALS"])
+                                 targets_lim$Sample[targets_lim$Group == "ALS"])  %>% filter(Gene %in% genes_with_diverse_mods)
 int_tsv_ctrl <- build_int_tsv_df(targets_div$Sample[targets_div$Group == "CTRL"],
-                                 targets_lim$Sample[targets_lim$Group == "CTRL"])
+                                 targets_lim$Sample[targets_lim$Group == "CTRL"]) %>% filter(Gene %in% genes_with_diverse_mods)
 
 p_fig4_tsv_all  <- make_int_plot(int_tsv_all,  "Protein Intensity (TSV): All Samples")
 p_fig4_tsv_als  <- make_int_plot(int_tsv_als,  "Protein Intensity (TSV): ALS Cells")
@@ -422,10 +423,33 @@ genes_of_interest_comp <- c(
   "USP10", "STUB1"
 )
 
-# Diverse PTM volcano ----
-highlight_pro <- table_protein_diverse %>% filter(Gene %in% genes_of_interest_pro)
+# Restrict all protein-level plots to proteins with ≥1 diverse-PTM-specific modification
+pep_classified <- y.peptide$genes %>%
+  mutate(
+    AllMod   = GetModsTextWReplacement(PeptideSequence, all_mods = TRUE) %>% sapply(paste),
+    Category = ClassifyPeptideModsSpecific(AllMod),
+    Category = ifelse(
+      Category == "Non-Enzymatic Mod" &
+        IsLimitedSearchPeptide(GetMods(PeptideSequence)),
+      "Limited-Search Mod",
+      Category
+    )
+  )
 
-p_fig4_pro_volcano <- ggplot(table_protein_diverse, aes(x = logFC, y = -log10(adj.P.Val))) +
+n_mod_strict <- pep_classified %>%
+  filter(Category %in% c("Enzymatic Mod", "Carboxymethylation", "Non-Enzymatic Mod")) %>%
+  group_by(Gene) %>%
+  summarise(n_mod = n(), .groups = "drop")
+
+genes_with_diverse_mods <- n_mod_strict %>% filter(n_mod >= 1) %>% pull(Gene)
+merged_pro_filt          <- merged_pro         %>% filter(Gene %in% genes_with_diverse_mods)
+table_pro_diverse_filt   <- table_protein_diverse %>% filter(Gene %in% genes_with_diverse_mods)
+
+
+# Diverse PTM volcano ----
+highlight_pro <- table_pro_diverse_filt %>% filter(Gene %in% genes_of_interest_pro)
+
+p_fig4_pro_volcano <- ggplot(table_pro_diverse_filt, aes(x = logFC, y = -log10(adj.P.Val))) +
   geom_point(aes(color = DEStatus), alpha = 0.6, size = 2, shape = 19) +
   scale_color_manual(values = de_status_colors) +
   geom_vline(xintercept = c(-logFC_cutoff, logFC_cutoff), linetype = "dashed", color = "black") +
@@ -450,9 +474,9 @@ ggsave(file.path(FIG_DIR, "Fig4_ProteinVolcano_Diverse.png"), p_fig4_pro_volcano
 ggsave(file.path(FIG_DIR, "Fig4_ProteinVolcano_Diverse.svg"), p_fig4_pro_volcano, width = 6, height = 5)
 
 # ModDiff volcano ----
-highlight_comp <- merged_pro %>% filter(Gene %in% genes_of_interest_comp)
+highlight_comp <- merged_pro_filt %>% filter(Gene %in% genes_of_interest_comp)
 
-p_fig4_moddiff <- ggplot(merged_pro, aes(x = logFC, y = -log10(adj.P.Val))) +
+p_fig4_moddiff <- ggplot(merged_pro_filt, aes(x = logFC, y = -log10(adj.P.Val))) +
   geom_point(aes(color = ModDiff), alpha = 0.7, size = 2.5) +
   scale_color_manual(values = modiff_colors) +
   scale_fill_manual(values = modiff_colors, guide = "none") +
@@ -479,7 +503,7 @@ ggsave(file.path(FIG_DIR, "Fig4_ModDiff_Volcano.png"), p_fig4_moddiff, width = 6
 ggsave(file.path(FIG_DIR, "Fig4_ModDiff_Volcano.svg"), p_fig4_moddiff, width = 6, height = 5)
 
 # logFC scatter ----
-p_fig4_scatter <- ggplot(merged_pro, aes(x = logFC, y = logFC_NoMod)) +
+p_fig4_scatter <- ggplot(merged_pro_filt, aes(x = logFC, y = logFC_NoMod)) +
   geom_point(aes(color = ModDiff), alpha = 0.7, size = 2.5) +
   scale_color_manual(values = modiff_colors) +
   scale_fill_manual(values = modiff_colors, guide = "none") +
@@ -509,7 +533,7 @@ ggsave(file.path(FIG_DIR, "Fig4_LogFC_Scatter.png"), p_fig4_scatter, width = 6, 
 ggsave(file.path(FIG_DIR, "Fig4_LogFC_Scatter.svg"), p_fig4_scatter, width = 6, height = 5)
 
 # Adjusted p-value scatter ----
-p_fig4_pval_scatter <- ggplot(merged_pro,
+p_fig4_pval_scatter <- ggplot(merged_pro_filt,
                               aes(x = -log10(adj.P.Val), y = -log10(adj.P.Val_NoMod))) +
   geom_point(aes(color = ModDiff), alpha = 0.7, size = 2.5) +
   scale_color_manual(values = modiff_colors) +
@@ -540,38 +564,13 @@ ggsave(file.path(FIG_DIR, "Fig4_PVal_Scatter.png"), p_fig4_pval_scatter, width =
 ggsave(file.path(FIG_DIR, "Fig4_PVal_Scatter.svg"), p_fig4_pval_scatter, width = 6, height = 5)
 
 # Modified peptide count vs logFC difference ----
-# Classify all peptides in y.peptide$genes by mod category (not table_occ, which
-# is restricted to proteins with ≥4 peptides). A new "Limited-Search Mod" category
-# captures peptides whose only modifications are Oxidation on M or Deamidation on
-# N/Q (detectable in a limited-PTM search); these are excluded from n_mod_strict.
-# IsLimitedSearchPeptide checks raw mod strings from GetMods() before text
-# replacement, which is required because .replaceMods collapses residue info
-# (e.g. "Hydroxylation on N" and "Oxidation on M" both become "Oxidation").
-
-pep_classified <- y.peptide$genes %>%
-  mutate(
-    AllMod   = GetModsTextWReplacement(PeptideSequence, all_mods = TRUE) %>% sapply(paste),
-    Category = ClassifyPeptideModsSpecific(AllMod),
-    Category = ifelse(
-      Category == "Non-Enzymatic Mod" &
-        IsLimitedSearchPeptide(GetMods(PeptideSequence)),
-      "Limited-Search Mod",
-      Category
-    )
-  )
-
-n_mod_strict <- pep_classified %>%
-  filter(Category %in% c("Enzymatic Mod", "Carboxymethylation", "Non-Enzymatic Mod")) %>%
-  group_by(Gene) %>%
-  summarise(n_mod = n(), .groups = "drop")
-
 pc_for_plot <- protein_cats %>%
   inner_join(n_mod_strict, by = "Gene") %>%
   inner_join(
-    merged_pro[, c("Gene", "LogFC_Diff", "ModDiff", "adj.P.Val", "adj.P.Val_NoMod", "logFC_NoMod")],
+    merged_pro_filt[, c("Gene", "LogFC_Diff", "ModDiff", "adj.P.Val", "adj.P.Val_NoMod", "logFC_NoMod")],
     by = "Gene"
   ) %>%
-  filter(n_mod > 5, n_mod < 2000) %>%
+  filter(n_mod >= 1) %>%
   mutate(p_diff = -log10(adj.P.Val) - (-log10(adj.P.Val_NoMod)))
 
 highlight_nmod <- pc_for_plot %>% filter(Gene %in% genes_of_interest_comp)
@@ -652,9 +651,9 @@ ggsave(file.path(FIG_DIR, "Fig4_PctMod_vs_Discordance.png"), p_fig4_pct_mod_scat
 ggsave(file.path(FIG_DIR, "Fig4_PctMod_vs_Discordance.svg"), p_fig4_pct_mod_scatter, width = 6.5, height = 5)
 
 # Limited PTM volcano, colored by ModDiff ----
-highlight_limited <- merged_pro %>% filter(Gene %in% highlight_pct_mod$Gene)
+highlight_limited <- merged_pro_filt %>% filter(Gene %in% highlight_pct_mod$Gene)
 
-p_fig4_limited_volcano <- ggplot(merged_pro,
+p_fig4_limited_volcano <- ggplot(merged_pro_filt,
                                  aes(x = logFC_NoMod, y = -log10(adj.P.Val_NoMod), color = ModDiff)) +
   geom_point(alpha = 0.8, size = 2.5) +
   scale_color_manual(values = modiff_colors) +
@@ -687,15 +686,17 @@ ggsave(file.path(FIG_DIR, "Fig4_LimitedVolcano_NMod.svg"), p_fig4_limited_volcan
 
 
 # Venn diagram ----
-fit_euler <- euler(list("Diverse PTMs" = diverse_de_genes,
-                        "Limited PTMs" = limited_de_genes))
+fit_euler <- euler(list(
+  "Diverse PTMs" = intersect(diverse_de_genes, genes_with_diverse_mods),
+  "Limited PTMs" = intersect(limited_de_genes, genes_with_diverse_mods)
+))
 
 p_fig4_venn <- plot(fit_euler,
                     quantities = list(cex = 1.3),
                     labels     = list(cex = 1.1, box = list(col = NA, fill = alpha("white", 0.6))),
                     fills      = list(fill = c("#ef5350", "#5c6bc0"), alpha = 0.45),
                     edges      = list(col = "grey20", lwd = 1.5),
-                    main       = "DE Proteins: Diverse vs. Limited PTMs")
+                    main       = "DA Proteins: Diverse vs. Limited PTMs\n(≥1 Diverse-Specific Mod)")
 
 png(file.path(FIG_DIR, "Fig4_Venn.png"), width = 5, height = 4, units = "in", res = 300)
 print(p_fig4_venn)
@@ -746,9 +747,9 @@ als_samples_lim  <- y.protein.lim$targets$Sample[y.protein.lim$targets$Group  ==
 ctrl_samples_div <- y.protein.filt$targets$Sample[y.protein.filt$targets$Group == "CTRL"]
 ctrl_samples_lim <- y.protein.lim$targets$Sample[y.protein.lim$targets$Group  == "CTRL"]
 
-int_all  <- build_int_df(NULL,            NULL)
-int_als  <- build_int_df(als_samples_div,  als_samples_lim)
-int_ctrl <- build_int_df(ctrl_samples_div, ctrl_samples_lim)
+int_all  <- build_int_df(NULL,             NULL)             %>% filter(Gene %in% genes_with_diverse_mods)
+int_als  <- build_int_df(als_samples_div,  als_samples_lim)  %>% filter(Gene %in% genes_with_diverse_mods)
+int_ctrl <- build_int_df(ctrl_samples_div, ctrl_samples_lim) %>% filter(Gene %in% genes_with_diverse_mods)
 
 int_nmod_scale <- scale_color_viridis_c(trans = "log10", name = "Modified\nPeptides",
                                         limits = c(NA, 100), oob = scales::squish,
@@ -805,9 +806,10 @@ read_protein_tsv <- function(protein_path, peptide_path) {
   pep_int_cols <- grep("^Intensity_", pep_header, value = TRUE)
   pro_int_idx  <- grep("^Intensity_Default_", colnames(pro))
   colnames(pro)[pro_int_idx] <- pep_int_cols
-  pro %>%
-    rename(ProteinGroup = `Protein Groups`, Gene = `Gene Name`) %>%
-    filter(grepl("Homo sapiens", Organism))
+  # Rename by pattern to avoid BOM or other invisible-character issues in column names
+  names(pro)[grep("Protein.*Group", names(pro), ignore.case = TRUE)[1]] <- "ProteinGroup"
+  names(pro)[grep("Gene.*Name",     names(pro), ignore.case = TRUE)[1]] <- "Gene"
+  pro %>% filter(grepl("Homo sapiens", Organism))
 }
 
 mean_int_from_tsv <- function(pro_df, sample_names) {
@@ -838,11 +840,11 @@ targets_div <- y.protein.filt$targets
 targets_lim <- y.protein.lim$targets
 
 int_tsv_all  <- build_int_tsv_df(targets_div$Sample,
-                                 targets_lim$Sample)
+                                 targets_lim$Sample)                              %>% filter(Gene %in% genes_with_diverse_mods)
 int_tsv_als  <- build_int_tsv_df(targets_div$Sample[targets_div$Group == "ALS"],
-                                 targets_lim$Sample[targets_lim$Group == "ALS"])
+                                 targets_lim$Sample[targets_lim$Group == "ALS"])  %>% filter(Gene %in% genes_with_diverse_mods)
 int_tsv_ctrl <- build_int_tsv_df(targets_div$Sample[targets_div$Group == "CTRL"],
-                                 targets_lim$Sample[targets_lim$Group == "CTRL"])
+                                 targets_lim$Sample[targets_lim$Group == "CTRL"]) %>% filter(Gene %in% genes_with_diverse_mods)
 
 p_fig4_tsv_all  <- make_int_plot(int_tsv_all,  "Protein Intensity (TSV): All Samples")
 p_fig4_tsv_als  <- make_int_plot(int_tsv_als,  "Protein Intensity (TSV): ALS Cells")
