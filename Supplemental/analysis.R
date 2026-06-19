@@ -13,50 +13,8 @@ source("MainManuscript/CustomScripts.R")
 PROP_OBS_MIN <- 0.1
 
 
-# ── SI Figure 1 | TDP-43 Stratification Clustering ───────────────────────────
-# Goal: show no meaningful clustering by TDP-43 level and minimal
-# protein-level changes across stratification groups.
-# Panel A: PCA of all samples, coloured by TDP-43 level.
-# Panel B: Volcano of within-ALS TDP-43 severity trend (should show ~0 DA proteins).
-
-# PCA — use proteins observed in >= 50% of samples to keep it robust
-min_obs <- ceiling(ncol(y.protein$E) * 0.5)
-prot_keep <- rowSums(!is.na(y.protein$E)) >= min_obs
-pca_mat   <- y.protein$E[prot_keep, ]
-
-# mean-impute any remaining NAs so prcomp doesn't drop samples
-pca_mat <- apply(pca_mat, 1, function(x) {
-  x[is.na(x)] <- mean(x, na.rm = TRUE); x
-}) %>% t()
-
-pca_res  <- prcomp(t(pca_mat), scale. = TRUE, center = TRUE)
-pca_var  <- summary(pca_res)$importance["Proportion of Variance", 1:2] * 100
-
-pca_df <- as.data.frame(pca_res$x[, 1:2]) %>%
-  tibble::rownames_to_column("Sample") %>%
-  left_join(targets[, c("Sample", "Group", "Donor", "TDP_Lvl")], by = "Sample")
-
-# Within-ALS TDP-43 severity trend (limma, linear contrast over ordered levels)
-tdp_order <- c("NON", "MLD", "MOD", "SEV")
-
-als_idx       <- targets$Group == "ALS"
-y.protein.als <- y.protein[, als_idx]
-targets.als   <- y.protein.als$targets
-targets.als$TDP_Lvl <- factor(targets.als$TDP_Lvl, levels = tdp_order, ordered = TRUE)
-
-design_tdp <- model.matrix(~ TDP_Lvl + PMI + Sex, data = targets.als)
-fit_tdp    <- lmFit(y.protein.als$E, design_tdp)
-fit_tdp    <- eBayes(fit_tdp)
-table_tdp  <- topTable(fit_tdp, coef = "TDP_Lvl.L", number = Inf, sort.by = "P")
-
-
-# ── SI Figure 2 | Carboxymethylation Analysis ─────────────────────────────────
-# Code exists in AlsMotorNeuronAnalysis — locate and migrate here.
-# TODO: source or paste CML analysis code once identified.
-
-
-# ── SI Figure 3 | FlashLFQ Protein-Level DA: Diverse vs Limited PTMs ─────────
-# Repeat of Figure 4 using FlashLFQ protein-level quantification
+# ── SI Figure 1 | FlashLFQ Protein-Level DA: Diverse vs Limited PTMs ─────────
+# Repeat of Figure 2 using FlashLFQ protein-level quantification
 # to demonstrate the diverse vs limited PTM pattern is method-agnostic.
 
 PATH_FLASHLFQ_DIVERSE <- "Data/DiversePtms/QuantifiedProteins.tsv"
@@ -183,3 +141,45 @@ write.table(merged_pro_flashlfq,
             file.path("Supplemental", "LimmaProteinDA_Comparison.tsv"),
             sep = "\t", row.names = FALSE, quote = FALSE)
 message("Wrote FlashLFQ DA results to Supplemental/")
+
+
+# ── SI Figure 2 | TDP-43 Stratification Clustering ───────────────────────────
+# Goal: show no meaningful clustering by TDP-43 level and minimal
+# protein-level changes across stratification groups.
+# Panel A: PCA of all samples, coloured by TDP-43 level.
+# Panel B: Volcano of within-ALS TDP-43 severity trend (should show ~0 DA proteins).
+
+# PCA — use proteins observed in >= 50% of samples to keep it robust
+min_obs <- ceiling(ncol(y.protein$E) * 0.5)
+prot_keep <- rowSums(!is.na(y.protein$E)) >= min_obs
+pca_mat   <- y.protein$E[prot_keep, ]
+
+# mean-impute any remaining NAs so prcomp doesn't drop samples
+pca_mat <- apply(pca_mat, 1, function(x) {
+  x[is.na(x)] <- mean(x, na.rm = TRUE); x
+}) %>% t()
+
+pca_res  <- prcomp(t(pca_mat), scale. = TRUE, center = TRUE)
+pca_var  <- summary(pca_res)$importance["Proportion of Variance", 1:2] * 100
+
+pca_df <- as.data.frame(pca_res$x[, 1:2]) %>%
+  tibble::rownames_to_column("Sample") %>%
+  left_join(targets[, c("Sample", "Group", "Donor", "TDP_Lvl")], by = "Sample")
+
+# Within-ALS TDP-43 severity trend (limma, linear contrast over ordered levels)
+tdp_order <- c("NON", "MLD", "MOD", "SEV")
+
+als_idx       <- targets$Group == "ALS"
+y.protein.als <- y.protein[, als_idx]
+targets.als   <- y.protein.als$targets
+targets.als$TDP_Lvl <- factor(targets.als$TDP_Lvl, levels = tdp_order, ordered = TRUE)
+
+design_tdp <- model.matrix(~ TDP_Lvl + PMI + Sex, data = targets.als)
+fit_tdp    <- lmFit(y.protein.als$E, design_tdp)
+fit_tdp    <- eBayes(fit_tdp)
+table_tdp  <- topTable(fit_tdp, coef = "TDP_Lvl.L", number = Inf, sort.by = "P")
+
+
+# ── SI Figure 3 | Carboxymethylation Analysis ─────────────────────────────────
+# Code exists in AlsMotorNeuronAnalysis — locate and migrate here.
+# TODO: source or paste CML analysis code once identified.

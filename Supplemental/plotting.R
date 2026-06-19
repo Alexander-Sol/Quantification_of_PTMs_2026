@@ -15,82 +15,8 @@ FIG_DIR   <- "Supplemental/Figures"
 TEXT_SIZE <- 1.1
 
 
-# ── SI Figure 1 | TDP-43 Stratification Clustering ───────────────────────────
-
-tdp_colors <- c(
-  "CTRL" = "#4575b4",
-  "NON"  = "#fee090",
-  "MLD"  = "#fdae61",
-  "MOD"  = "#f46d43",
-  "SEV"  = "#d73027"
-)
-
-# Panel A: PCA ----
-p_sifig1_pca <- ggplot(pca_df, aes(x = PC1, y = PC2, color = TDP_Lvl, shape = Group)) +
-  geom_point(size = 3, alpha = 0.85) +
-  scale_color_manual(values = tdp_colors, name = "TDP-43 Level") +
-  scale_shape_manual(values = c("ALS" = 16, "CTRL" = 17), name = "Condition") +
-  labs(
-    x = sprintf("PC1 (%.1f%%)", pca_var[1]),
-    y = sprintf("PC2 (%.1f%%)", pca_var[2]),
-    title = "PCA of Protein Intensities"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title      = element_text(size = 13 * TEXT_SIZE),
-    axis.title      = element_text(size = 11 * TEXT_SIZE),
-    axis.text       = element_text(size = 10 * TEXT_SIZE),
-    legend.text     = element_text(size = 10 * TEXT_SIZE),
-    legend.title    = element_text(size = 10 * TEXT_SIZE),
-    legend.position = "right"
-  )
-
-# Panel B: within-ALS TDP-43 trend volcano ----
-pval_cutoff_tdp <- 0.05
-
-table_tdp <- table_tdp %>%
-  mutate(Significant = adj.P.Val < pval_cutoff_tdp)
-
-n_sig <- sum(table_tdp$Significant)
-
-p_sifig1_volcano <- ggplot(table_tdp, aes(x = logFC, y = -log10(P.Value))) +
-  geom_point(aes(color = Significant), alpha = 0.6, size = 1.8) +
-  scale_color_manual(values = c("FALSE" = "grey70", "TRUE" = "#d73027"),
-                     labels = c("Not significant", sprintf("FDR < %.2f", pval_cutoff_tdp)),
-                     name = NULL) +
-  geom_hline(yintercept = -log10(max(table_tdp$P.Value[table_tdp$Significant],
-                                     na.rm = TRUE)),
-             linetype = "dashed", color = "grey40", linewidth = 0.4) +
-  annotate("text", x = Inf, y = Inf,
-           label = sprintf("DA proteins: %d", n_sig),
-           hjust = 1.1, vjust = 1.5, size = 4 * TEXT_SIZE, color = "grey20") +
-  labs(
-    x = "Log2 Fold Change (per TDP-43 severity unit)",
-    y = "-Log10 P-value",
-    title = "Within-ALS TDP-43 Severity Trend"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title      = element_text(size = 13 * TEXT_SIZE),
-    axis.title      = element_text(size = 11 * TEXT_SIZE),
-    axis.text       = element_text(size = 10 * TEXT_SIZE),
-    legend.text     = element_text(size = 10 * TEXT_SIZE),
-    legend.position = "inside",
-    legend.position.inside = c(0.15, 0.9)
-  )
-
-p_sifig1 <- plot_grid(p_sifig1_pca, p_sifig1_volcano, nrow = 1, labels = c("A", "B"))
-ggsave(file.path(FIG_DIR, "SIFig1_TDP43_Clustering.png"),
-       p_sifig1, width = 12, height = 5, dpi = 300)
-
-
-# ── SI Figure 2 | Carboxymethylation Analysis ─────────────────────────────────
-# TODO: migrate CML plots from AlsMotorNeuronAnalysis once analysis code is in place.
-# Likely panels: per-protein CML peptide counts, logFC distribution for CML peptides.
-
-
-# ── SI Figure 3 | FlashLFQ Protein-Level DA: Diverse vs Limited PTMs ─────────
-# Parallel to Figure 4 but using FlashLFQ quantification.
+# ── SI Figure 1 | FlashLFQ Protein-Level DA: Diverse vs Limited PTMs ─────────
+# Parallel to Figure 2 but using FlashLFQ quantification.
 # Requires merged_pro_flashlfq from Supplemental/analysis.R and
 # table_occ / n_mod_strict from MainManuscript/analysis.R + plotting.R.
 
@@ -120,14 +46,14 @@ if (!exists("n_mod_strict")) {
 pc_fl <- merged_pro_flashlfq %>%
   select(Gene, LogFC_Diff, ModDiff, logFC_NoMod, adj.P.Val, adj.P.Val_NoMod) %>%
   inner_join(n_mod_strict, by = "Gene") %>%
-  filter(n_mod > 10, n_mod < 200) %>%
+  filter(n_mod >= 5) %>%
   mutate(p_diff = -log10(adj.P.Val) - (-log10(adj.P.Val_NoMod)))
 
 highlight_fl      <- merged_pro_flashlfq %>% filter(Gene %in% genes_highlight_fl)
 highlight_fl_disc <- pc_fl              %>% filter(Gene %in% genes_highlight_fl)
 
 # Shared theme helpers ----
-sifig3_theme <- theme_minimal() +
+sifig1_theme <- theme_minimal() +
   theme(
     plot.title      = element_text(size = 14 * TEXT_SIZE),
     axis.title      = element_text(size = 12 * TEXT_SIZE),
@@ -136,7 +62,7 @@ sifig3_theme <- theme_minimal() +
   )
 
 # Diverse PTM volcano ----
-p_sifig3_volcano <- ggplot(table_protein_diverse_flashlfq,
+p_sifig1_volcano <- ggplot(table_protein_diverse_flashlfq,
     aes(x = logFC, y = -log10(adj.P.Val))) +
   geom_point(aes(color = DEStatus), alpha = 0.6, size = 2) +
   scale_color_manual(values = de_status_colors_fl) +
@@ -151,12 +77,12 @@ p_sifig3_volcano <- ggplot(table_protein_diverse_flashlfq,
                   box.padding = 0.5, min.segment.length = 0, max.overlaps = Inf) +
   labs(x = "Log2 Fold Change", y = "-Log10 Adjusted P-value",
        title = "DA Proteins: Diverse PTMs\n(FlashLFQ)") +
-  sifig3_theme
+  sifig1_theme
 
-ggsave(file.path(FIG_DIR, "SIFig3_Volcano_Diverse.png"), p_sifig3_volcano, width = 6, height = 5, dpi = 300)
+ggsave(file.path(FIG_DIR, "SIFig1_Volcano_Diverse.png"), p_sifig1_volcano, width = 6, height = 5, dpi = 300)
 
 # ModDiff volcano ----
-p_sifig3_moddiff <- ggplot(merged_pro_flashlfq,
+p_sifig1_moddiff <- ggplot(merged_pro_flashlfq,
     aes(x = logFC, y = -log10(adj.P.Val), color = ModDiff)) +
   geom_point(alpha = 0.7, size = 2.5) +
   scale_color_manual(values = modiff_colors_fl) +
@@ -173,12 +99,12 @@ p_sifig3_moddiff <- ggplot(merged_pro_flashlfq,
                   max.overlaps = Inf, force = 3) +
   labs(x = "Log2 Fold Change", y = "-Log10 Adjusted P-value",
        title = "DA Changes with Modifications\n(FlashLFQ)") +
-  sifig3_theme
+  sifig1_theme
 
-ggsave(file.path(FIG_DIR, "SIFig3_ModDiff_Volcano.png"), p_sifig3_moddiff, width = 6, height = 5, dpi = 300)
+ggsave(file.path(FIG_DIR, "SIFig1_ModDiff_Volcano.png"), p_sifig1_moddiff, width = 6, height = 5, dpi = 300)
 
 # logFC scatter: diverse vs limited ----
-p_sifig3_scatter <- ggplot(merged_pro_flashlfq,
+p_sifig1_scatter <- ggplot(merged_pro_flashlfq,
     aes(x = logFC, y = logFC_NoMod, color = ModDiff)) +
   geom_point(alpha = 0.7, size = 2.5) +
   scale_color_manual(values = modiff_colors_fl) +
@@ -192,15 +118,16 @@ p_sifig3_scatter <- ggplot(merged_pro_flashlfq,
                   color = "black", size = 4.5, fontface = "bold",
                   box.padding = 1.5, point.padding = 0.5,
                   min.segment.length = 0, max.overlaps = Inf, force = 3) +
-  labs(x = "Log2FC (Diverse PTMs)", y = "Log2FC (Limited PTMs)",
-       title = "Protein Log2FC: Diverse vs Limited\n(FlashLFQ)") +
-  sifig3_theme
+  labs(x = "Log2 Fold Change (Diverse PTMs)",
+       y = "Log2 Fold Change (Limited PTMs)",
+       title = "Comparison of Protein Log2FC With\nand Without Modified Peptides (FlashLFQ)") +
+  sifig1_theme
 
-ggsave(file.path(FIG_DIR, "SIFig3_LogFC_Scatter.png"), p_sifig3_scatter, width = 6, height = 5, dpi = 300)
+ggsave(file.path(FIG_DIR, "SIFig1_LogFC_Scatter.png"), p_sifig1_scatter, width = 6, height = 5, dpi = 300)
 
 # PctMod vs Discordance ----
 # n_mod from limpa peptide analysis; discordance from FlashLFQ limma comparison.
-p_sifig3_pctmod <- ggplot(pc_fl, aes(x = LogFC_Diff, y = p_diff, color = n_mod)) +
+p_sifig1_pctmod <- ggplot(pc_fl, aes(x = LogFC_Diff, y = p_diff, color = n_mod)) +
   geom_point(alpha = 0.8, size = 2.5) +
   scale_color_viridis_c(trans = "log10", name = "Modified\nPeptides",
                         limits = c(NA, 100), oob = scales::squish,
@@ -213,9 +140,9 @@ p_sifig3_pctmod <- ggplot(pc_fl, aes(x = LogFC_Diff, y = p_diff, color = n_mod))
                   color = "black", size = 4.5, fontface = "bold",
                   box.padding = 0.5, min.segment.length = 0,
                   max.overlaps = Inf, force = 3) +
-  labs(x = "Log2FC Difference (Diverse − Limited)",
-       y = "Δ (−log10 Adj. P-value)",
-       title = "Modified Peptide Count vs. DA Discordance\n(FlashLFQ)") +
+  labs(x = "Log2 FC Difference (Diverse − Limited)",
+       y = "-Log10 Adj. P-value Difference (Diverse - Limited)",
+       title = "Changes in Differential Abundance when\nModifications are Considered (FlashLFQ)") +
   theme_minimal() +
   theme(
     plot.title      = element_text(size = 14 * TEXT_SIZE),
@@ -226,13 +153,13 @@ p_sifig3_pctmod <- ggplot(pc_fl, aes(x = LogFC_Diff, y = p_diff, color = n_mod))
     legend.title    = element_text(size = 11 * TEXT_SIZE)
   )
 
-ggsave(file.path(FIG_DIR, "SIFig3_PctMod_vs_Discordance.png"), p_sifig3_pctmod, width = 6.5, height = 5, dpi = 300)
-ggsave(file.path(FIG_DIR, "SIFig3_PctMod_vs_Discordance.svg"), p_sifig3_pctmod, width = 6.5, height = 5)
+ggsave(file.path(FIG_DIR, "SIFig1_PctMod_vs_Discordance.png"), p_sifig1_pctmod, width = 6.5, height = 5, dpi = 300)
+ggsave(file.path(FIG_DIR, "SIFig1_PctMod_vs_Discordance.svg"), p_sifig1_pctmod, width = 6.5, height = 5)
 
 # Limited PTM volcano colored by ModDiff ----
 highlight_fl_lim <- merged_pro_flashlfq %>% filter(Gene %in% genes_highlight_fl)
 
-p_sifig3_lim_volcano <- ggplot(merged_pro_flashlfq,
+p_sifig1_lim_volcano <- ggplot(merged_pro_flashlfq,
     aes(x = logFC_NoMod, y = -log10(adj.P.Val_NoMod), color = ModDiff)) +
   geom_point(alpha = 0.8, size = 2.5) +
   scale_color_manual(values = modiff_colors_fl) +
@@ -252,32 +179,108 @@ p_sifig3_lim_volcano <- ggplot(merged_pro_flashlfq,
   labs(x = "Log2 Fold Change (Limited PTMs)",
        y = "-Log10 Adjusted P-value (Limited PTMs)",
        title = "DA Proteins: Limited PTMs\n(FlashLFQ)") +
-  sifig3_theme
+  sifig1_theme
 
-ggsave(file.path(FIG_DIR, "SIFig3_LimitedVolcano.png"), p_sifig3_lim_volcano, width = 6, height = 5, dpi = 300)
+ggsave(file.path(FIG_DIR, "SIFig1_LimitedVolcano.png"), p_sifig1_lim_volcano, width = 6, height = 5, dpi = 300)
 
-# Venn diagram ----
+# Venn diagram — proteins with >= 1 modified peptide (mirrors Figure 2 Venn) ----
+genes_with_mods_fl <- n_mod_strict %>% filter(n_mod >= 1) %>% pull(Gene)
+
 fit_euler_fl <- euler(list(
-  "Diverse PTMs" = flashlfq_diverse_de,
-  "Limited PTMs" = flashlfq_limited_de
+  "Diverse PTMs" = intersect(flashlfq_diverse_de, genes_with_mods_fl),
+  "Limited PTMs" = intersect(flashlfq_limited_de, genes_with_mods_fl)
 ))
 
-p_sifig3_venn <- plot(fit_euler_fl,
+p_sifig1_venn <- plot(fit_euler_fl,
                       quantities = list(cex = 1.3),
                       labels     = list(cex = 1.1, box = list(col = NA, fill = alpha("white", 0.6))),
                       fills      = list(fill = c("#ef5350", "#5c6bc0"), alpha = 0.45),
                       edges      = list(col = "grey20", lwd = 1.5),
                       main       = "DE Proteins: Diverse vs. Limited PTMs\n(FlashLFQ)")
 
-png(file.path(FIG_DIR, "SIFig3_Venn.png"), width = 5, height = 4, units = "in", res = 300)
-print(p_sifig3_venn)
+png(file.path(FIG_DIR, "SIFig1_Venn.png"), width = 5, height = 4, units = "in", res = 300)
+print(p_sifig1_venn)
 dev.off()
 
 # Combined panel ----
-p_sifig3_combined <- plot_grid(
-  p_sifig3_volcano, p_sifig3_moddiff, p_sifig3_scatter,
-  p_sifig3_lim_volcano, p_sifig3_pctmod,
+p_sifig1_combined <- plot_grid(
+  p_sifig1_volcano, p_sifig1_moddiff, p_sifig1_scatter,
+  p_sifig1_lim_volcano, p_sifig1_pctmod,
   nrow = 2, labels = c("A", "B", "C", "D", "E")
 )
-ggsave(file.path(FIG_DIR, "SIFig3_Combined.png"), p_sifig3_combined,
+ggsave(file.path(FIG_DIR, "SIFig1_Combined.png"), p_sifig1_combined,
        width = 18, height = 10, dpi = 300)
+
+
+# ── SI Figure 2 | TDP-43 Stratification Clustering ───────────────────────────
+
+tdp_colors <- c(
+  "CTRL" = "#4575b4",
+  "NON"  = "#fee090",
+  "MLD"  = "#fdae61",
+  "MOD"  = "#f46d43",
+  "SEV"  = "#d73027"
+)
+
+# Panel A: PCA ----
+p_sifig2_pca <- ggplot(pca_df, aes(x = PC1, y = PC2, color = TDP_Lvl, shape = Group)) +
+  geom_point(size = 3, alpha = 0.85) +
+  scale_color_manual(values = tdp_colors, name = "TDP-43 Level") +
+  scale_shape_manual(values = c("ALS" = 16, "CTRL" = 17), name = "Condition") +
+  labs(
+    x = sprintf("PC1 (%.1f%%)", pca_var[1]),
+    y = sprintf("PC2 (%.1f%%)", pca_var[2]),
+    title = "PCA of Protein Intensities"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title      = element_text(size = 13 * TEXT_SIZE),
+    axis.title      = element_text(size = 11 * TEXT_SIZE),
+    axis.text       = element_text(size = 10 * TEXT_SIZE),
+    legend.text     = element_text(size = 10 * TEXT_SIZE),
+    legend.title    = element_text(size = 10 * TEXT_SIZE),
+    legend.position = "right"
+  )
+
+# Panel B: within-ALS TDP-43 trend volcano ----
+pval_cutoff_tdp <- 0.05
+
+table_tdp <- table_tdp %>%
+  mutate(Significant = adj.P.Val < pval_cutoff_tdp)
+
+n_sig <- sum(table_tdp$Significant)
+
+p_sifig2_volcano <- ggplot(table_tdp, aes(x = logFC, y = -log10(P.Value))) +
+  geom_point(aes(color = Significant), alpha = 0.6, size = 1.8) +
+  scale_color_manual(values = c("FALSE" = "grey70", "TRUE" = "#d73027"),
+                     labels = c("Not significant", sprintf("FDR < %.2f", pval_cutoff_tdp)),
+                     name = NULL) +
+  geom_hline(yintercept = -log10(max(table_tdp$P.Value[table_tdp$Significant],
+                                     na.rm = TRUE)),
+             linetype = "dashed", color = "grey40", linewidth = 0.4) +
+  annotate("text", x = Inf, y = Inf,
+           label = sprintf("DA proteins: %d", n_sig),
+           hjust = 1.1, vjust = 1.5, size = 4 * TEXT_SIZE, color = "grey20") +
+  labs(
+    x = "Log2 Fold Change (per TDP-43 severity unit)",
+    y = "-Log10 P-value",
+    title = "Within-ALS TDP-43 Severity Trend"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title      = element_text(size = 13 * TEXT_SIZE),
+    axis.title      = element_text(size = 11 * TEXT_SIZE),
+    axis.text       = element_text(size = 10 * TEXT_SIZE),
+    legend.text     = element_text(size = 10 * TEXT_SIZE),
+    legend.position = "inside",
+    legend.position.inside = c(0.15, 0.9)
+  )
+
+p_sifig2 <- plot_grid(p_sifig2_pca, p_sifig2_volcano, nrow = 1, labels = c("A", "B"))
+ggsave(file.path(FIG_DIR, "SIFig2_TDP43_Clustering.png"),
+       p_sifig2, width = 12, height = 5, dpi = 300)
+
+
+# ── SI Figure 3 | Carboxymethylation Analysis ─────────────────────────────────
+# TODO: migrate CML plots from AlsMotorNeuronAnalysis once analysis code is in place.
+# Likely panels: per-protein CML peptide counts, logFC distribution for CML peptides.
