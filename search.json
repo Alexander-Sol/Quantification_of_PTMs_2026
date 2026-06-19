@@ -1,0 +1,297 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Quantifying PTMs in Single-Cell Proteomics",
+    "section": "",
+    "text": "This site is the analysis companion to Improved discovery and quantification of post-translational modifications in single-cell proteomics — a re-analysis of single-cell proteomics data from ALS (amyotrophic lateral sclerosis) motor neurons (original dataset).\nIt walks through the full workflow, from raw spectra to publication figures, so that the analysis can be reproduced or adapted to a new dataset.",
+    "crumbs": [
+      "Home",
+      "Overview"
+    ]
+  },
+  {
+    "objectID": "index.html#the-pipeline-at-a-glance",
+    "href": "index.html#the-pipeline-at-a-glance",
+    "title": "Quantifying PTMs in Single-Cell Proteomics",
+    "section": "The pipeline at a glance",
+    "text": "The pipeline at a glance\n\n\n\nStep\nTool\nPurpose\nOutput\n\n\n\n\n1\nMetaMorpheus\nPeptide/protein identification + PTM discovery (GPTMD)\nAllPSMs.psmtsv, AllPeptides.psmtsv\n\n\n2\nFlashLFQ + PIP-ECHO\nLabel-free quantification with FDR-controlled match-between-runs\nQuantifiedPeptides.tsv, QuantifiedProteins.tsv\n\n\n3\nlimpa\nDropout-curve modeling, protein summarization, probabilistic imputation\nEList objects\n\n\n4\nR (limma / tidyverse)\nDifferential abundance, PTM-occupancy analysis, figures\nFigures 1–4",
+    "crumbs": [
+      "Home",
+      "Overview"
+    ]
+  },
+  {
+    "objectID": "index.html#the-central-question",
+    "href": "index.html#the-central-question",
+    "title": "Quantifying PTMs in Single-Cell Proteomics",
+    "section": "The central question",
+    "text": "The central question\nMost single-cell proteomics studies search with a limited set of modifications. We ask what changes when the same cells are searched against a diverse panel of PTMs:\n\nHow many additional peptidoforms and modification types are discovered?\nDo modified peptidoforms carry differential-abundance signal that a limited search misses?\nWhere do protein-level conclusions diverge between the two search strategies?\n\nThroughout, two parallel searches are compared:\n\nDiverse PTMs — GPTMD + search against the UniProt human XML, allowing a broad PTM panel.\nLimited PTMs — GPTMD + search against the UniProt human FASTA, restricted to three variable modifications (deamidation, pyroglutamate, oxidation of methionine).",
+    "crumbs": [
+      "Home",
+      "Overview"
+    ]
+  },
+  {
+    "objectID": "index.html#the-dataset",
+    "href": "index.html#the-dataset",
+    "title": "Quantifying PTMs in Single-Cell Proteomics",
+    "section": "The dataset",
+    "text": "The dataset\n~100 single motor neurons stratified by TDP-43 pathology severity (CTL / NON / MLD / MOD / SEV), from five post-mortem donors.",
+    "crumbs": [
+      "Home",
+      "Overview"
+    ]
+  },
+  {
+    "objectID": "index.html#reproducing-this-work",
+    "href": "index.html#reproducing-this-work",
+    "title": "Quantifying PTMs in Single-Cell Proteomics",
+    "section": "Reproducing this work",
+    "text": "Reproducing this work\n\nInstall the tools — MetaMorpheus, FlashLFQ, R (≥ 4.3) with limpa, limma, and tidyverse.\nSteps 1–3 require the raw .raw/.mzML spectra, which are not redistributed here. Follow the linked pages to regenerate the quantification tables.\nStep 4 runs directly from the quantification tables included in the repository under Data/ (large tables are tracked with Git LFS). Open Quantification_of_PTMs.Rproj in RStudio and source MainManuscript/analysis.R, then MainManuscript/plotting.R.\n\n\nThe code in these pages is shown for reference and is not executed when the site is built, because the raw inputs are not public. The figures shown are the actual manuscript outputs.\n\nAll source code lives in the GitHub repository.",
+    "crumbs": [
+      "Home",
+      "Overview"
+    ]
+  },
+  {
+    "objectID": "03-limpa.html",
+    "href": "03-limpa.html",
+    "title": "3 · Modeling with limpa",
+    "section": "",
+    "text": "limpa models the dropout curve — the relationship between a peptide’s underlying abundance and its probability of being missing — then uses it to summarize peptides into proteins and to impute missing values in a way that respects that missingness mechanism. This is what makes a principled differential analysis possible on sparse single-cell data.",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "3 · limpa modeling"
+    ]
+  },
+  {
+    "objectID": "03-limpa.html#installation",
+    "href": "03-limpa.html#installation",
+    "title": "3 · Modeling with limpa",
+    "section": "Installation",
+    "text": "Installation\n# Bioconductor\nif (!require(\"BiocManager\", quietly = TRUE)) install.packages(\"BiocManager\")\nBiocManager::install(\"limpa\")",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "3 · limpa modeling"
+    ]
+  },
+  {
+    "objectID": "03-limpa.html#from-quantification-table-to-elist",
+    "href": "03-limpa.html#from-quantification-table-to-elist",
+    "title": "3 · Modeling with limpa",
+    "section": "From quantification table to EList",
+    "text": "From quantification table to EList\nlimpa works on a limma-style EList with three parts: an expression matrix (E), a peptide/gene annotation table (genes), and a sample metadata table (targets). In this project those are built from the FlashLFQ QuantifiedPeptides.tsv by helper functions in MainManuscript/CustomScripts.R:\nlibrary(limpa)\nsource(\"MainManuscript/CustomScripts.R\")\n\ndf   &lt;- read.csv(\"Data/DiversePtms/QuantifiedPeptides.tsv\", sep = \"\\t\", row.names = NULL)\ndf   &lt;- df[grepl(\"Homo sapiens\", df$Organism), ]\ndf   &lt;- CleanAmbiguousPeptides(df)          # resolve human/contaminant ambiguity\n\nintensity_cols &lt;- grep(\"^Intensity_\", colnames(df), value = TRUE)\nexpr    &lt;- GetExpressionMatrix(df, intensity_cols)   # log2, zeros -&gt; NA\ngenes   &lt;- GetGeneTable(df)                          # PeptideSequence / BaseSequence / ProteinGroup / Gene\ntargets &lt;- GetMetaDataTdpStratified(expr)            # Group / TDP_Lvl / Donor / PMI / Age / Sex\n\ny.peptide &lt;- structure(list(E = expr, genes = genes, targets = targets), class = \"EList\")",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "3 · limpa modeling"
+    ]
+  },
+  {
+    "objectID": "03-limpa.html#dropout-curve-modeling-summarization-and-imputation",
+    "href": "03-limpa.html#dropout-curve-modeling-summarization-and-imputation",
+    "title": "3 · Modeling with limpa",
+    "section": "Dropout-curve modeling, summarization, and imputation",
+    "text": "Dropout-curve modeling, summarization, and imputation\n# 1. Fit the dropout curve\ndpcfit &lt;- dpc(y.peptide)\nplotDPC(dpcfit)\n\n# 2. Summarize peptides to proteins (information-aware)\ny.protein &lt;- dpcQuant(y.peptide, \"ProteinGroup\", dpc = dpcfit, verbose = TRUE)\n\n# 3. Impute peptide-level missing values for occupancy analysis\ny.peptide.imputed &lt;- dpcImpute(y.peptide, \"PeptideSequence\", dpc = dpcfit, verbose = TRUE)\ndpcQuant() propagates per-measurement standard errors into y.protein$other$standard.error, which the PTM-occupancy analysis later combines when normalizing modified peptides to their parent protein.\n\n\n\n\n\n\nNote\n\n\n\nThese steps are slow. MainManuscript/analysis.R caches y.peptide, dpcfit, y.protein, and y.peptide.imputed as .rds files in Data/; delete those cache files to force a full rerun.\n\n\n\nPaper: Quantification and differential analysis of mass spectrometry proteomics data with probabilistic recovery of information from missing values\n\nNext: Downstream R analysis & figures →",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "3 · limpa modeling"
+    ]
+  },
+  {
+    "objectID": "01-metamorpheus.html",
+    "href": "01-metamorpheus.html",
+    "title": "1 · Identification with MetaMorpheus",
+    "section": "",
+    "text": "MetaMorpheus performs peptide and protein identification and, critically for this work, PTM discovery via GPTMD (Global Post-Translational Modification Discovery). Two parallel searches are run — one with a diverse PTM panel and one with a limited panel — so that the downstream analysis can compare them.",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "1 · MetaMorpheus search"
+    ]
+  },
+  {
+    "objectID": "01-metamorpheus.html#installation",
+    "href": "01-metamorpheus.html#installation",
+    "title": "1 · Identification with MetaMorpheus",
+    "section": "Installation",
+    "text": "Installation\nDownload MetaMorpheus from the release page.",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "1 · MetaMorpheus search"
+    ]
+  },
+  {
+    "objectID": "01-metamorpheus.html#inputs-and-outputs",
+    "href": "01-metamorpheus.html#inputs-and-outputs",
+    "title": "1 · Identification with MetaMorpheus",
+    "section": "Inputs and outputs",
+    "text": "Inputs and outputs\n\nInput: .raw spectra files and a protein database (.fasta or .xml).\nOutput: AllPeptides.psmtsv, AllProteinGroups.psmtsv, AllPSMs.psmtsv.",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "1 · MetaMorpheus search"
+    ]
+  },
+  {
+    "objectID": "01-metamorpheus.html#walkthrough",
+    "href": "01-metamorpheus.html#walkthrough",
+    "title": "1 · Identification with MetaMorpheus",
+    "section": "Walkthrough",
+    "text": "Walkthrough\n\nDatabases\nDrag and drop a .fasta or .xml database and click +ADD DEFAULT CONTAMINANTS.\n\nDatabases for the target species can be downloaded from UniProt.\nThe .xml format extends the .fasta file with annotated PTMs collected from the literature — this is what enables the diverse search. The limited search uses the plain .fasta.\n\n\n\n\nAdding a database\n\n\n\n\nSpectra\nDrag and drop the .raw spectra files.\n\n\n\nLoading spectra\n\n\n\n\nTasks\n\n\n\nTask list\n\n\n\nTask 1 — +ADD CALIBRATION (defaults)\nTask 2 — +AVERAGE SPECTRA (defaults)\nTask 3 — +ADD PTM DISCOVERY (GPTMD) with defaults plus selection of trypsin-digested modifications. This is where the diverse PTM panel is defined.\n\n\n\nGPTMD modification selection\n\n\nTask 4 — +ADD SEARCH with quantification turned off (quantification is performed separately in FlashLFQ).\n\n\n\nSearch task settings\n\n\n\n\n\nRun\nClick RUN METAMORPHEUS, changing the output folder if desired.\n\n\n\nRunning the search\n\n\n\n\n\n\n\n\nTip\n\n\n\nRun the search twice — once with the diverse .xml database and GPTMD panel, and once with the limited .fasta and restricted modifications — keeping the outputs in separate folders (DiversePtms/ and LimitedPtms/). The downstream analysis expects both.\n\n\nNext: Quantification with FlashLFQ + PIP-ECHO →",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "1 · MetaMorpheus search"
+    ]
+  },
+  {
+    "objectID": "02-flashlfq.html",
+    "href": "02-flashlfq.html",
+    "title": "2 · Quantification with FlashLFQ + PIP-ECHO",
+    "section": "",
+    "text": "FlashLFQ performs label-free quantification. Its PIP-ECHO mode (Peptide-Identity-Propagation with Empirically-Calibrated, FDR-controlled match-between-runs) recovers quantities for peptides that were identified in some cells but not others — essential for the sparse, missing-value-heavy single-cell setting.",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "2 · FlashLFQ + PIP-ECHO"
+    ]
+  },
+  {
+    "objectID": "02-flashlfq.html#installation",
+    "href": "02-flashlfq.html#installation",
+    "title": "2 · Quantification with FlashLFQ + PIP-ECHO",
+    "section": "Installation",
+    "text": "Installation\nDownload FlashLFQ from the release page.",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "2 · FlashLFQ + PIP-ECHO"
+    ]
+  },
+  {
+    "objectID": "02-flashlfq.html#inputs-and-outputs",
+    "href": "02-flashlfq.html#inputs-and-outputs",
+    "title": "2 · Quantification with FlashLFQ + PIP-ECHO",
+    "section": "Inputs and outputs",
+    "text": "Inputs and outputs\n\nInput: AllPeptides.psmtsv, AllPSMs.psmtsv (from MetaMorpheus) and .mzML spectra files.\nOutput: QuantifiedPeaks.tsv, QuantifiedPeptides.tsv, QuantifiedProteins.tsv.",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "2 · FlashLFQ + PIP-ECHO"
+    ]
+  },
+  {
+    "objectID": "02-flashlfq.html#walkthrough",
+    "href": "02-flashlfq.html#walkthrough",
+    "title": "2 · Quantification with FlashLFQ + PIP-ECHO",
+    "section": "Walkthrough",
+    "text": "Walkthrough\n\nIdentifications\nDrag and drop the AllPeptides.psmtsv and AllPSMs.psmtsv files produced by MetaMorpheus.\n\n\n\nLoading identifications\n\n\n\n\nSpectra\nDrag and drop the .mzML spectra files from the MetaMorpheus calibration task.\nDefine an ExperimentalDesign.tsv in the same folder as the .mzML files, or edit the Condition, Sample, Fraction, and Replicate fields directly in the GUI. After an initial run, FlashLFQ writes an experimental-design file automatically that you can refine.\n\n\n\nLoading spectra and experimental design\n\n\n\n\nSettings\nUse the defaults, and enable Peptide-identity-propagation (Match-between-runs) with a 0.01 PIP FDR cutoff.\n\n\n\nQuantification settings\n\n\n\n\nRun\nClick RUN FLASHLFQ, changing the output folder if desired.\n\n\n\nRunning quantification\n\n\n\n\n\n\n\n\nNote\n\n\n\nThe resulting QuantifiedPeptides.tsv (one per search strategy) is the direct input to the R analysis in step 4. These tables are included in the repository under Data/DiversePtms/ and Data/LimitedPtms/.\n\n\n\nReference: Improved detection of differentially abundant proteins through FDR-control of peptide-identity-propagation\n\nNext: Differential expression with limpa →",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "2 · FlashLFQ + PIP-ECHO"
+    ]
+  },
+  {
+    "objectID": "04-r-analysis.html",
+    "href": "04-r-analysis.html",
+    "title": "4 · Downstream Analysis in R",
+    "section": "",
+    "text": "This page walks through the R analysis that turns the quantification tables into the manuscript’s results and figures. The full scripts are:",
+    "crumbs": [
+      "Home",
+      "Downstream Analysis",
+      "4 · R analysis & figures"
+    ]
+  },
+  {
+    "objectID": "04-r-analysis.html#setup",
+    "href": "04-r-analysis.html#setup",
+    "title": "4 · Downstream Analysis in R",
+    "section": "Setup",
+    "text": "Setup\nlibrary(tidyverse)\nlibrary(limpa)\nlibrary(limma)\nsource(\"MainManuscript/CustomScripts.R\")\n\n# Thresholds used throughout\nPROP_OBS_MIN_ANALYSIS &lt;- 0.02   # peptide observability filter applied before model fitting\nPROP_OBS_MIN_RESULTS  &lt;- 0.12   # stricter filter for reported results (~observed in &gt;= 10 cells)\nlogFC_cutoff &lt;- 1.5\npval_cutoff  &lt;- 0.05\nThe two FlashLFQ searches are loaded the same way; the diverse-PTM EList (y.peptide, y.protein, y.peptide.imputed) and the limited-PTM EList (y.peptide.lim, y.protein.lim) are built as shown on the limpa page and cached to Data/.",
+    "crumbs": [
+      "Home",
+      "Downstream Analysis",
+      "4 · R analysis & figures"
+    ]
+  },
+  {
+    "objectID": "04-r-analysis.html#quality-control",
+    "href": "04-r-analysis.html#quality-control",
+    "title": "4 · Downstream Analysis in R",
+    "section": "Quality control",
+    "text": "Quality control\nBefore any filtering, per-sample log2 intensity distributions are checked for systematic shifts between ALS and control cells, at both the peptide and protein level.\npep_long &lt;- as.data.frame(y.peptide$E) %&gt;%\n  rownames_to_column(\"PeptideSequence\") %&gt;%\n  pivot_longer(-PeptideSequence, names_to = \"Sample\", values_to = \"Log2Int\") %&gt;%\n  filter(!is.na(Log2Int)) %&gt;%\n  left_join(y.peptide$targets[, c(\"Sample\", \"Group\")], by = \"Sample\")\n\nggplot(pep_long, aes(x = Log2Int, color = Group)) +\n  geom_density() +\n  scale_color_manual(values = c(\"ALS\" = \"#d73027\", \"CTRL\" = \"#4575b4\"))\n\n\n\nQC: peptide- and protein-level intensity distributions by condition.",
+    "crumbs": [
+      "Home",
+      "Downstream Analysis",
+      "4 · R analysis & figures"
+    ]
+  },
+  {
+    "objectID": "04-r-analysis.html#figure-1-ptm-discovery-diverse-vs-limited-searches",
+    "href": "04-r-analysis.html#figure-1-ptm-discovery-diverse-vs-limited-searches",
+    "title": "4 · Downstream Analysis in R",
+    "section": "Figure 1 — PTM discovery: diverse vs limited searches",
+    "text": "Figure 1 — PTM discovery: diverse vs limited searches\nFigure 1 quantifies how much more is discovered by the diverse search. PSMs and peptidoforms are filtered to a 1% peptide-level FDR, counted per cell for each search strategy, and the diverse search’s modifications are broken down into enzymatic vs non-enzymatic classes.\nfilter_mm_results &lt;- function(df, q_threshold = 1, pep_q_threshold = 0.01) {\n  df %&gt;% filter(PEP_QValue &lt;= pep_q_threshold,\n                QValue     &lt;= q_threshold,\n                !grepl(\"C|D\", Decoy.Contaminant.Target))\n}\n\ndiverse_psm &lt;- read.csv(PATH_DIVERSE_PSM, sep = \"\\t\") %&gt;% filter_mm_results()\nlimited_psm &lt;- read.csv(PATH_LIMITED_PSM, sep = \"\\t\") %&gt;% filter_mm_results()\n\n# Per-cell counts, then a modification-type breakdown of the diverse search\nmod_list &lt;- GetModsTextWReplacement(diverse_psm$Full.Sequence, all_mods = TRUE)\n\n\n\n\n\n\nNote\n\n\n\nThis panel reads the raw AllPSMs.psmtsv / AllPeptides.psmtsv files, which are not redistributed (they live on the lab network and are git-ignored). Copy your MetaMorpheus outputs into Data/DiversePtms/ and Data/LimitedPtms/ to regenerate it.\n\n\n\n\n\nFigure 1. Discovery gains from the diverse PTM search: PSMs and peptidoforms per cell (A, B) and the enzymatic (C) and non-enzymatic (D) modifications detected.",
+    "crumbs": [
+      "Home",
+      "Downstream Analysis",
+      "4 · R analysis & figures"
+    ]
+  },
+  {
+    "objectID": "04-r-analysis.html#figure-2-peptidoform-composition-and-the-occupancy-model",
+    "href": "04-r-analysis.html#figure-2-peptidoform-composition-and-the-occupancy-model",
+    "title": "4 · Downstream Analysis in R",
+    "section": "Figure 2 — Peptidoform composition and the occupancy model",
+    "text": "Figure 2 — Peptidoform composition and the occupancy model\nEvery peptidoform is classified — unmodified, enzymatic, carboxymethylation, carbamidomethylation, or other non-enzymatic — using ClassifyPeptideModsSpecific(). Figure 2 shows how that composition shifts as the peptide set is restricted to significant and high-fold-change differential peptidoforms.\nThe differential test itself works on PTM occupancy: each modified peptide is normalized to its parent protein (propagating standard error), low-coverage peptides are filtered out, and dpcDE() / eBayes() test for an ALS-vs-control difference, blocking on donor.\ndesign &lt;- model.matrix(formula(~0 + Group), data = targets)\ncolnames(design) &lt;- gsub(\"Group\", \"\", colnames(design))\n\n# Normalize each modified peptide to its parent protein (SE-propagating)\nall.mod.normed.pro &lt;- GetNormalizedEList(\n  y.peptide.imputed$genes$PeptideSequence, y.peptide.imputed,\n  y.protein = y.protein, normalize_to_protein = TRUE\n)\nall.mod.normed.pro &lt;- all.mod.normed.pro[all.mod.normed.pro$genes$PropObs &gt;= PROP_OBS_MIN_ANALYSIS, ]\n\nfit_occ    &lt;- dpcDE(all.mod.normed.pro, block = targets$Donor, design = design, plot = FALSE)\nfit_occ2   &lt;- contrasts.fit(fit_occ, makeContrasts(ALS_vs_CTRL = \"ALS - CTRL\", levels = design))\neb_fit_occ &lt;- eBayes(fit_occ2)\n\ntable_occ &lt;- topTable(eb_fit_occ, coef = \"ALS_vs_CTRL\", number = Inf)\ntable_occ$Category &lt;- ClassifyPeptideModsSpecific(\n  GetModsTextWReplacement(table_occ$PeptideSequence, all_mods = TRUE) %&gt;% sapply(paste)\n)\n\n\n\nFigure 2. Peptidoform category composition across increasing stringency.",
+    "crumbs": [
+      "Home",
+      "Downstream Analysis",
+      "4 · R analysis & figures"
+    ]
+  },
+  {
+    "objectID": "04-r-analysis.html#figure-3-differentially-modified-peptidoforms",
+    "href": "04-r-analysis.html#figure-3-differentially-modified-peptidoforms",
+    "title": "4 · Downstream Analysis in R",
+    "section": "Figure 3 — Differentially modified peptidoforms",
+    "text": "Figure 3 — Differentially modified peptidoforms\nPeptidoforms passing the occupancy test (adj.P.Val &lt;= 0.05, |logFC| &gt;= 1.5) are visualized in a volcano plot colored by modification class, with neurofilaments, GFAP, and elongation factors highlighted. The modifications driving these differential peptidoforms are then tallied.\nde_splice &lt;- base_filtered %&gt;%\n  filter(adj.P.Val &lt;= pval_cutoff, abs(logFC) &gt;= logFC_cutoff, PropObs &gt; PROP_OBS_MIN_RESULTS) %&gt;%\n  arrange(desc(abs(logFC)))\n\n\n\nFigure 3. Volcano of differentially modified peptidoforms, colored by modification category.\n\n\n\n\n\n\n\n\nEnzymatic modifications\n\n\n\n\n\n\n\nNon-enzymatic modifications",
+    "crumbs": [
+      "Home",
+      "Downstream Analysis",
+      "4 · R analysis & figures"
+    ]
+  },
+  {
+    "objectID": "04-r-analysis.html#figure-4-protein-level-differential-abundance-diverse-vs-limited",
+    "href": "04-r-analysis.html#figure-4-protein-level-differential-abundance-diverse-vs-limited",
+    "title": "4 · Downstream Analysis in R",
+    "section": "Figure 4 — Protein-level differential abundance: diverse vs limited",
+    "text": "Figure 4 — Protein-level differential abundance: diverse vs limited\nFinally, protein-level differential abundance is run for both searches (proteins with ≥ 2 peptides; dpcDE() + eBayes(), blocked on donor) and the two result tables are merged. Genes are labeled by whether their DA call is shared, diverse-only (ModDA), or limited-only (NoModDA), and each gene’s modified-peptide count is attached. This is where including modified peptidoforms visibly changes which proteins are called differentially abundant.\ny.protein.filt &lt;- y.protein[y.protein$genes$NPeptides &gt;= 2, ]\nfit_pro    &lt;- dpcDE(y.protein.filt, design = design, block = targets$Donor,\n                    plot = FALSE, sample.weights = TRUE)\nfit_pro2   &lt;- contrasts.fit(fit_pro, makeContrasts(ALS_vs_CTRL = \"ALS - CTRL\", levels = design))\ntable_protein_diverse &lt;- topTable(eBayes(fit_pro2), coef = \"ALS_vs_CTRL\", number = Inf)\n\n# ... the same for the limited search (table_protein_limited) ...\n\nmerged_pro &lt;- merge(table_protein_diverse,\n                    table_protein_limited[, c(\"Gene\", \"logFC\", \"adj.P.Val\")],\n                    by = \"Gene\", suffixes = c(\"\", \"_NoMod\")) %&gt;%\n  mutate(LogFC_Diff = logFC - logFC_NoMod,\n         ModDiff = case_when(\n           Gene %in% setdiff(limited_de_genes, diverse_de_genes) ~ \"NoModDA\",\n           Gene %in% setdiff(diverse_de_genes, limited_de_genes) ~ \"ModDA\",\n           TRUE ~ \"Shared\"))\n\n\n\n\n\n\nDifferential abundance shifts when modifications are considered.\n\n\n\n\n\n\n\nProtein log2 fold change with vs without modified peptides.\n\n\n\n\n\n\n\n\nFigure 4. Overlap of differentially abundant proteins between the diverse and limited searches.",
+    "crumbs": [
+      "Home",
+      "Downstream Analysis",
+      "4 · R analysis & figures"
+    ]
+  },
+  {
+    "objectID": "04-r-analysis.html#outputs",
+    "href": "04-r-analysis.html#outputs",
+    "title": "4 · Downstream Analysis in R",
+    "section": "Outputs",
+    "text": "Outputs\nanalysis.R writes the key result tables to Data/:\n\nDE_proteins.tsv — differentially abundant proteins (diverse search).\nModDiscordant_proteins.tsv — proteins whose DA call differs between searches.\nModDiscordant_withCat_breakdown.tsv — the same, with per-category modified-peptide counts.\n\nplotting.R writes every figure to MainManuscript/Figures/. To regenerate everything from the cached quantification tables:\nsource(\"MainManuscript/analysis.R\")   # builds all analysis objects (uses Data/ cache if present)\nsource(\"MainManuscript/plotting.R\")   # writes figures to MainManuscript/Figures/",
+    "crumbs": [
+      "Home",
+      "Downstream Analysis",
+      "4 · R analysis & figures"
+    ]
+  }
+]

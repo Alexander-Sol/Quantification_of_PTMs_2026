@@ -1,4 +1,0 @@
-# R cached objects — large, tracked via Git LFS
-*.rds filter=lfs diff=lfs merge=lfs -text
-# Data/analysis output files — large, tracked via Git LFS
-*.tsv filter=lfs diff=lfs merge=lfs -text
