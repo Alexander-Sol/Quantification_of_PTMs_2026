@@ -55,150 +55,6 @@
     ]
   },
   {
-    "objectID": "03-limpa.html",
-    "href": "03-limpa.html",
-    "title": "3 · Modeling with limpa",
-    "section": "",
-    "text": "limpa models the dropout curve — the relationship between a peptide’s underlying abundance and its probability of being missing — then uses it to summarize peptides into proteins and to impute missing values in a way that respects that missingness mechanism. This is what makes a principled differential analysis possible on sparse single-cell data.",
-    "crumbs": [
-      "Home",
-      "Identification & Quantification",
-      "3 · limpa modeling"
-    ]
-  },
-  {
-    "objectID": "03-limpa.html#installation",
-    "href": "03-limpa.html#installation",
-    "title": "3 · Modeling with limpa",
-    "section": "Installation",
-    "text": "Installation\n# Bioconductor\nif (!require(\"BiocManager\", quietly = TRUE)) install.packages(\"BiocManager\")\nBiocManager::install(\"limpa\")",
-    "crumbs": [
-      "Home",
-      "Identification & Quantification",
-      "3 · limpa modeling"
-    ]
-  },
-  {
-    "objectID": "03-limpa.html#from-quantification-table-to-elist",
-    "href": "03-limpa.html#from-quantification-table-to-elist",
-    "title": "3 · Modeling with limpa",
-    "section": "From quantification table to EList",
-    "text": "From quantification table to EList\nlimpa works on a limma-style EList with three parts: an expression matrix (E), a peptide/gene annotation table (genes), and a sample metadata table (targets). In this project those are built from the FlashLFQ QuantifiedPeptides.tsv by helper functions in MainManuscript/CustomScripts.R:\nlibrary(limpa)\nsource(\"MainManuscript/CustomScripts.R\")\n\ndf   &lt;- read.csv(\"Data/DiversePtms/QuantifiedPeptides.tsv\", sep = \"\\t\", row.names = NULL)\ndf   &lt;- df[grepl(\"Homo sapiens\", df$Organism), ]\ndf   &lt;- CleanAmbiguousPeptides(df)          # resolve human/contaminant ambiguity\n\nintensity_cols &lt;- grep(\"^Intensity_\", colnames(df), value = TRUE)\nexpr    &lt;- GetExpressionMatrix(df, intensity_cols)   # log2, zeros -&gt; NA\ngenes   &lt;- GetGeneTable(df)                          # PeptideSequence / BaseSequence / ProteinGroup / Gene\ntargets &lt;- GetMetaDataTdpStratified(expr)            # Group / TDP_Lvl / Donor / PMI / Age / Sex\n\ny.peptide &lt;- structure(list(E = expr, genes = genes, targets = targets), class = \"EList\")",
-    "crumbs": [
-      "Home",
-      "Identification & Quantification",
-      "3 · limpa modeling"
-    ]
-  },
-  {
-    "objectID": "03-limpa.html#dropout-curve-modeling-summarization-and-imputation",
-    "href": "03-limpa.html#dropout-curve-modeling-summarization-and-imputation",
-    "title": "3 · Modeling with limpa",
-    "section": "Dropout-curve modeling, summarization, and imputation",
-    "text": "Dropout-curve modeling, summarization, and imputation\n# 1. Fit the dropout curve\ndpcfit &lt;- dpc(y.peptide)\nplotDPC(dpcfit)\n\n# 2. Summarize peptides to proteins (information-aware)\ny.protein &lt;- dpcQuant(y.peptide, \"ProteinGroup\", dpc = dpcfit, verbose = TRUE)\n\n# 3. Impute peptide-level missing values for occupancy analysis\ny.peptide.imputed &lt;- dpcImpute(y.peptide, \"PeptideSequence\", dpc = dpcfit, verbose = TRUE)\ndpcQuant() propagates per-measurement standard errors into y.protein$other$standard.error, which the PTM-occupancy analysis later combines when normalizing modified peptides to their parent protein.\n\n\n\n\n\n\nNote\n\n\n\nThese steps are slow. MainManuscript/analysis.R caches y.peptide, dpcfit, y.protein, and y.peptide.imputed as .rds files in Data/; delete those cache files to force a full rerun.\n\n\n\nPaper: Quantification and differential analysis of mass spectrometry proteomics data with probabilistic recovery of information from missing values\n\nNext: Downstream R analysis & figures →",
-    "crumbs": [
-      "Home",
-      "Identification & Quantification",
-      "3 · limpa modeling"
-    ]
-  },
-  {
-    "objectID": "01-metamorpheus.html",
-    "href": "01-metamorpheus.html",
-    "title": "1 · Identification with MetaMorpheus",
-    "section": "",
-    "text": "MetaMorpheus performs peptide and protein identification and, critically for this work, PTM discovery via GPTMD (Global Post-Translational Modification Discovery). Two parallel searches are run — one with a diverse PTM panel and one with a limited panel — so that the downstream analysis can compare them.",
-    "crumbs": [
-      "Home",
-      "Identification & Quantification",
-      "1 · MetaMorpheus search"
-    ]
-  },
-  {
-    "objectID": "01-metamorpheus.html#installation",
-    "href": "01-metamorpheus.html#installation",
-    "title": "1 · Identification with MetaMorpheus",
-    "section": "Installation",
-    "text": "Installation\nDownload MetaMorpheus from the release page.",
-    "crumbs": [
-      "Home",
-      "Identification & Quantification",
-      "1 · MetaMorpheus search"
-    ]
-  },
-  {
-    "objectID": "01-metamorpheus.html#inputs-and-outputs",
-    "href": "01-metamorpheus.html#inputs-and-outputs",
-    "title": "1 · Identification with MetaMorpheus",
-    "section": "Inputs and outputs",
-    "text": "Inputs and outputs\n\nInput: .raw spectra files and a protein database (.fasta or .xml).\nOutput: AllPeptides.psmtsv, AllProteinGroups.psmtsv, AllPSMs.psmtsv.",
-    "crumbs": [
-      "Home",
-      "Identification & Quantification",
-      "1 · MetaMorpheus search"
-    ]
-  },
-  {
-    "objectID": "01-metamorpheus.html#walkthrough",
-    "href": "01-metamorpheus.html#walkthrough",
-    "title": "1 · Identification with MetaMorpheus",
-    "section": "Walkthrough",
-    "text": "Walkthrough\n\nDatabases\nDrag and drop a .fasta or .xml database and click +ADD DEFAULT CONTAMINANTS.\n\nDatabases for the target species can be downloaded from UniProt.\nThe .xml format extends the .fasta file with annotated PTMs collected from the literature — this is what enables the diverse search. The limited search uses the plain .fasta.\n\n\n\n\nAdding a database\n\n\n\n\nSpectra\nDrag and drop the .raw spectra files.\n\n\n\nLoading spectra\n\n\n\n\nTasks\n\n\n\nTask list\n\n\n\nTask 1 — +ADD CALIBRATION (defaults)\nTask 2 — +AVERAGE SPECTRA (defaults)\nTask 3 — +ADD PTM DISCOVERY (GPTMD) with defaults plus selection of trypsin-digested modifications. This is where the diverse PTM panel is defined.\n\n\n\nGPTMD modification selection\n\n\nTask 4 — +ADD SEARCH with quantification turned off (quantification is performed separately in FlashLFQ).\n\n\n\nSearch task settings\n\n\n\n\n\nRun\nClick RUN METAMORPHEUS, changing the output folder if desired.\n\n\n\nRunning the search\n\n\n\n\n\n\n\n\nTip\n\n\n\nRun the search twice — once with the diverse .xml database and GPTMD panel, and once with the limited .fasta and restricted modifications — keeping the outputs in separate folders (DiversePtms/ and LimitedPtms/). The downstream analysis expects both.\n\n\nNext: Quantification with FlashLFQ + PIP-ECHO →",
-    "crumbs": [
-      "Home",
-      "Identification & Quantification",
-      "1 · MetaMorpheus search"
-    ]
-  },
-  {
-    "objectID": "02-flashlfq.html",
-    "href": "02-flashlfq.html",
-    "title": "2 · Quantification with FlashLFQ + PIP-ECHO",
-    "section": "",
-    "text": "FlashLFQ performs label-free quantification. Its PIP-ECHO mode (Peptide-Identity-Propagation with Empirically-Calibrated, FDR-controlled match-between-runs) recovers quantities for peptides that were identified in some cells but not others — essential for the sparse, missing-value-heavy single-cell setting.",
-    "crumbs": [
-      "Home",
-      "Identification & Quantification",
-      "2 · FlashLFQ + PIP-ECHO"
-    ]
-  },
-  {
-    "objectID": "02-flashlfq.html#installation",
-    "href": "02-flashlfq.html#installation",
-    "title": "2 · Quantification with FlashLFQ + PIP-ECHO",
-    "section": "Installation",
-    "text": "Installation\nDownload FlashLFQ from the release page.",
-    "crumbs": [
-      "Home",
-      "Identification & Quantification",
-      "2 · FlashLFQ + PIP-ECHO"
-    ]
-  },
-  {
-    "objectID": "02-flashlfq.html#inputs-and-outputs",
-    "href": "02-flashlfq.html#inputs-and-outputs",
-    "title": "2 · Quantification with FlashLFQ + PIP-ECHO",
-    "section": "Inputs and outputs",
-    "text": "Inputs and outputs\n\nInput: AllPeptides.psmtsv, AllPSMs.psmtsv (from MetaMorpheus) and .mzML spectra files.\nOutput: QuantifiedPeaks.tsv, QuantifiedPeptides.tsv, QuantifiedProteins.tsv.",
-    "crumbs": [
-      "Home",
-      "Identification & Quantification",
-      "2 · FlashLFQ + PIP-ECHO"
-    ]
-  },
-  {
-    "objectID": "02-flashlfq.html#walkthrough",
-    "href": "02-flashlfq.html#walkthrough",
-    "title": "2 · Quantification with FlashLFQ + PIP-ECHO",
-    "section": "Walkthrough",
-    "text": "Walkthrough\n\nIdentifications\nDrag and drop the AllPeptides.psmtsv and AllPSMs.psmtsv files produced by MetaMorpheus.\n\n\n\nLoading identifications\n\n\n\n\nSpectra\nDrag and drop the .mzML spectra files from the MetaMorpheus calibration task.\nDefine an ExperimentalDesign.tsv in the same folder as the .mzML files, or edit the Condition, Sample, Fraction, and Replicate fields directly in the GUI. After an initial run, FlashLFQ writes an experimental-design file automatically that you can refine.\n\n\n\nLoading spectra and experimental design\n\n\n\n\nSettings\nUse the defaults, and enable Peptide-identity-propagation (Match-between-runs) with a 0.01 PIP FDR cutoff.\n\n\n\nQuantification settings\n\n\n\n\nRun\nClick RUN FLASHLFQ, changing the output folder if desired.\n\n\n\nRunning quantification\n\n\n\n\n\n\n\n\nNote\n\n\n\nThe resulting QuantifiedPeptides.tsv (one per search strategy) is the direct input to the R analysis in step 4. These tables are included in the repository under Data/DiversePtms/ and Data/LimitedPtms/.\n\n\n\nReference: Improved detection of differentially abundant proteins through FDR-control of peptide-identity-propagation\n\nNext: Differential expression with limpa →",
-    "crumbs": [
-      "Home",
-      "Identification & Quantification",
-      "2 · FlashLFQ + PIP-ECHO"
-    ]
-  },
-  {
     "objectID": "04-r-analysis.html",
     "href": "04-r-analysis.html",
     "title": "4 · Downstream Analysis in R",
@@ -292,6 +148,150 @@
       "Home",
       "Downstream Analysis",
       "4 · R analysis & figures"
+    ]
+  },
+  {
+    "objectID": "02-flashlfq.html",
+    "href": "02-flashlfq.html",
+    "title": "2 · Quantification with FlashLFQ + PIP-ECHO",
+    "section": "",
+    "text": "FlashLFQ performs label-free quantification. Its PIP-ECHO mode (Peptide-Identity-Propagation with Empirically-Calibrated, FDR-controlled match-between-runs) recovers quantities for peptides that were identified in some cells but not others — essential for the sparse, missing-value-heavy single-cell setting.",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "2 · FlashLFQ + PIP-ECHO"
+    ]
+  },
+  {
+    "objectID": "02-flashlfq.html#installation",
+    "href": "02-flashlfq.html#installation",
+    "title": "2 · Quantification with FlashLFQ + PIP-ECHO",
+    "section": "Installation",
+    "text": "Installation\nDownload FlashLFQ from the release page.",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "2 · FlashLFQ + PIP-ECHO"
+    ]
+  },
+  {
+    "objectID": "02-flashlfq.html#inputs-and-outputs",
+    "href": "02-flashlfq.html#inputs-and-outputs",
+    "title": "2 · Quantification with FlashLFQ + PIP-ECHO",
+    "section": "Inputs and outputs",
+    "text": "Inputs and outputs\n\nInput: AllPeptides.psmtsv, AllPSMs.psmtsv (from MetaMorpheus) and .mzML spectra files.\nOutput: QuantifiedPeaks.tsv, QuantifiedPeptides.tsv, QuantifiedProteins.tsv.",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "2 · FlashLFQ + PIP-ECHO"
+    ]
+  },
+  {
+    "objectID": "02-flashlfq.html#walkthrough",
+    "href": "02-flashlfq.html#walkthrough",
+    "title": "2 · Quantification with FlashLFQ + PIP-ECHO",
+    "section": "Walkthrough",
+    "text": "Walkthrough\n\nIdentifications\nDrag and drop the AllPeptides.psmtsv and AllPSMs.psmtsv files produced by MetaMorpheus.\n\n\n\nLoading identifications\n\n\n\n\nSpectra\nDrag and drop the .mzML spectra files from the MetaMorpheus calibration task.\nDefine an ExperimentalDesign.tsv in the same folder as the .mzML files, or edit the Condition, Sample, Fraction, and Replicate fields directly in the GUI. After an initial run, FlashLFQ writes an experimental-design file automatically that you can refine.\n\n\n\nLoading spectra and experimental design\n\n\n\n\nSettings\nUse the defaults, and enable Peptide-identity-propagation (Match-between-runs) with a 0.01 PIP FDR cutoff.\n\n\n\nQuantification settings\n\n\n\n\nRun\nClick RUN FLASHLFQ, changing the output folder if desired.\n\n\n\nRunning quantification\n\n\n\n\n\n\n\n\nNote\n\n\n\nThe resulting QuantifiedPeptides.tsv (one per search strategy) is the direct input to the R analysis in step 4. These tables are included in the repository under Data/DiversePtms/ and Data/LimitedPtms/.\n\n\n\nReference: Improved detection of differentially abundant proteins through FDR-control of peptide-identity-propagation\n\nNext: Differential expression with limpa →",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "2 · FlashLFQ + PIP-ECHO"
+    ]
+  },
+  {
+    "objectID": "03-limpa.html",
+    "href": "03-limpa.html",
+    "title": "3 · Modeling with limpa",
+    "section": "",
+    "text": "limpa models the dropout curve — the relationship between a peptide’s underlying abundance and its probability of being missing — then uses it to summarize peptides into proteins and to impute missing values in a way that respects that missingness mechanism. This is what makes a principled differential analysis possible on sparse single-cell data.",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "3 · limpa modeling"
+    ]
+  },
+  {
+    "objectID": "03-limpa.html#installation",
+    "href": "03-limpa.html#installation",
+    "title": "3 · Modeling with limpa",
+    "section": "Installation",
+    "text": "Installation\n# Bioconductor\nif (!require(\"BiocManager\", quietly = TRUE)) install.packages(\"BiocManager\")\nBiocManager::install(\"limpa\")",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "3 · limpa modeling"
+    ]
+  },
+  {
+    "objectID": "03-limpa.html#from-quantification-table-to-elist",
+    "href": "03-limpa.html#from-quantification-table-to-elist",
+    "title": "3 · Modeling with limpa",
+    "section": "From quantification table to EList",
+    "text": "From quantification table to EList\nlimpa works on a limma-style EList with three parts: an expression matrix (E), a peptide/gene annotation table (genes), and a sample metadata table (targets). In this project those are built from the FlashLFQ QuantifiedPeptides.tsv by helper functions in MainManuscript/CustomScripts.R:\nlibrary(limpa)\nsource(\"MainManuscript/CustomScripts.R\")\n\ndf   &lt;- read.csv(\"Data/DiversePtms/QuantifiedPeptides.tsv\", sep = \"\\t\", row.names = NULL)\ndf   &lt;- df[grepl(\"Homo sapiens\", df$Organism), ]\ndf   &lt;- CleanAmbiguousPeptides(df)          # resolve human/contaminant ambiguity\n\nintensity_cols &lt;- grep(\"^Intensity_\", colnames(df), value = TRUE)\nexpr    &lt;- GetExpressionMatrix(df, intensity_cols)   # log2, zeros -&gt; NA\ngenes   &lt;- GetGeneTable(df)                          # PeptideSequence / BaseSequence / ProteinGroup / Gene\ntargets &lt;- GetMetaDataTdpStratified(expr)            # Group / TDP_Lvl / Donor / PMI / Age / Sex\n\ny.peptide &lt;- structure(list(E = expr, genes = genes, targets = targets), class = \"EList\")",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "3 · limpa modeling"
+    ]
+  },
+  {
+    "objectID": "03-limpa.html#dropout-curve-modeling-summarization-and-imputation",
+    "href": "03-limpa.html#dropout-curve-modeling-summarization-and-imputation",
+    "title": "3 · Modeling with limpa",
+    "section": "Dropout-curve modeling, summarization, and imputation",
+    "text": "Dropout-curve modeling, summarization, and imputation\n# 1. Fit the dropout curve\ndpcfit &lt;- dpc(y.peptide)\nplotDPC(dpcfit)\n\n# 2. Summarize peptides to proteins (information-aware)\ny.protein &lt;- dpcQuant(y.peptide, \"ProteinGroup\", dpc = dpcfit, verbose = TRUE)\n\n# 3. Impute peptide-level missing values for occupancy analysis\ny.peptide.imputed &lt;- dpcImpute(y.peptide, \"PeptideSequence\", dpc = dpcfit, verbose = TRUE)\ndpcQuant() propagates per-measurement standard errors into y.protein$other$standard.error, which the PTM-occupancy analysis later combines when normalizing modified peptides to their parent protein.\n\n\n\n\n\n\nNote\n\n\n\nThese steps are slow. MainManuscript/analysis.R caches y.peptide, dpcfit, y.protein, and y.peptide.imputed as .rds files in Data/; delete those cache files to force a full rerun.\n\n\n\nPaper: Quantification and differential analysis of mass spectrometry proteomics data with probabilistic recovery of information from missing values\n\nNext: Downstream R analysis & figures →",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "3 · limpa modeling"
+    ]
+  },
+  {
+    "objectID": "01-metamorpheus.html",
+    "href": "01-metamorpheus.html",
+    "title": "1 · Identification with MetaMorpheus",
+    "section": "",
+    "text": "MetaMorpheus performs peptide and protein identification and, critically for this work, PTM discovery via GPTMD (Global Post-Translational Modification Discovery). Two parallel searches are run — one with a diverse PTM panel and one with a limited panel — so that the downstream analysis can compare them.",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "1 · MetaMorpheus search"
+    ]
+  },
+  {
+    "objectID": "01-metamorpheus.html#installation",
+    "href": "01-metamorpheus.html#installation",
+    "title": "1 · Identification with MetaMorpheus",
+    "section": "Installation",
+    "text": "Installation\nDownload MetaMorpheus from the release page.",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "1 · MetaMorpheus search"
+    ]
+  },
+  {
+    "objectID": "01-metamorpheus.html#inputs-and-outputs",
+    "href": "01-metamorpheus.html#inputs-and-outputs",
+    "title": "1 · Identification with MetaMorpheus",
+    "section": "Inputs and outputs",
+    "text": "Inputs and outputs\n\nInput: .raw spectra files and a protein database (.fasta or .xml).\nOutput: AllPeptides.psmtsv, AllProteinGroups.psmtsv, AllPSMs.psmtsv.",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "1 · MetaMorpheus search"
+    ]
+  },
+  {
+    "objectID": "01-metamorpheus.html#walkthrough",
+    "href": "01-metamorpheus.html#walkthrough",
+    "title": "1 · Identification with MetaMorpheus",
+    "section": "Walkthrough",
+    "text": "Walkthrough\n\nDatabases\nDrag and drop a .fasta or .xml database and click +ADD DEFAULT CONTAMINANTS.\n\nDatabases for the target species can be downloaded from UniProt.\nThe .xml format extends the .fasta file with annotated PTMs collected from the literature — this is what enables the diverse search. The limited search uses the plain .fasta.\n\n\n\n\nAdding a database\n\n\n\n\nSpectra\nDrag and drop the .raw spectra files.\n\n\n\nLoading spectra\n\n\n\n\nTasks\n\n\n\nTask list\n\n\n\nTask 1 — +ADD CALIBRATION (defaults)\nTask 2 — +AVERAGE SPECTRA (defaults)\nTask 3 — +ADD PTM DISCOVERY (GPTMD) with defaults plus selection of trypsin-digested modifications. This is where the diverse PTM panel is defined.\n\n\n\nGPTMD modification selection\n\n\nTask 4 — +ADD SEARCH with quantification turned off (quantification is performed separately in FlashLFQ).\n\n\n\nSearch task settings\n\n\n\n\n\nRun\nClick RUN METAMORPHEUS, changing the output folder if desired.\n\n\n\nRunning the search\n\n\n\n\n\n\n\n\nTip\n\n\n\nRun the search twice — once with the diverse .xml database and GPTMD panel, and once with the limited .fasta and restricted modifications — keeping the outputs in separate folders (DiversePtms/ and LimitedPtms/). The downstream analysis expects both.\n\n\nNext: Quantification with FlashLFQ + PIP-ECHO →",
+    "crumbs": [
+      "Home",
+      "Identification & Quantification",
+      "1 · MetaMorpheus search"
     ]
   }
 ]
