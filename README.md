@@ -5,7 +5,7 @@ single-cell proteomics_** — an R-based re-analysis of single-cell proteomics d
 (amyotrophic lateral sclerosis) motor neurons
 ([original dataset](https://doi.org/10.1016/j.celrep.2023.113636)).
 
-📖 **Walkthrough / pipeline tutorial:** <https://alexander-sol.github.io/Quantification_of_PTMs_2026/>
+**Walkthrough / pipeline tutorial:** <https://alexander-sol.github.io/Quantification_of_PTMs_2026/>
 
 The site walks through the entire workflow — from raw spectra to publication figures — so the
 analysis can be reproduced or adapted to a new dataset.
