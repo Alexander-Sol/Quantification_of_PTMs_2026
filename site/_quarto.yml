@@ -1,0 +1,62 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "Quantifying PTMs in Single-Cell Proteomics"
+  description: "Reproducible pipeline for discovery and quantification of post-translational modifications in single-cell proteomics."
+  reader-mode: true
+  page-navigation: true
+  navbar:
+    background: primary
+    left:
+      - text: "Home"
+        href: index.qmd
+      - text: "1. MetaMorpheus"
+        href: 01-metamorpheus.qmd
+      - text: "2. FlashLFQ + PIP-ECHO"
+        href: 02-flashlfq.qmd
+      - text: "3. limpa"
+        href: 03-limpa.qmd
+      - text: "4. R Analysis"
+        href: 04-r-analysis.qmd
+    right:
+      - icon: github
+        href: https://github.com/Alexander-Sol/Quantification_of_PTMs_2026
+        aria-label: GitHub repository
+  sidebar:
+    style: docked
+    collapse-level: 1
+    contents:
+      - text: "Overview"
+        href: index.qmd
+      - section: "Identification & Quantification"
+        contents:
+          - text: "1 · MetaMorpheus search"
+            href: 01-metamorpheus.qmd
+          - text: "2 · FlashLFQ + PIP-ECHO"
+            href: 02-flashlfq.qmd
+          - text: "3 · limpa modeling"
+            href: 03-limpa.qmd
+      - section: "Downstream Analysis"
+        contents:
+          - text: "4 · R analysis & figures"
+            href: 04-r-analysis.qmd
+  page-footer:
+    center: "Code companion to *Improved discovery and quantification of post-translational modifications in single-cell proteomics*."
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    code-copy: true
+    code-overflow: wrap
+    df-print: paged
+    fig-align: center
+
+# Documentation-only site: code chunks are shown for reference but not executed,
+# because the raw mass-spec inputs are not redistributed with the repository.
+execute:
+  eval: false
+  echo: true

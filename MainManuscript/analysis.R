@@ -10,7 +10,10 @@ library(tidyverse)
 library(limpa)
 library(limma)
 
-setwd("C:/Users/Alex/Source/Repos/Quantification_of_PTMs_2026")
+# All paths below are relative to the repository root. Set the working
+# directory to the repo root before running (opening Quantification_of_PTMs.Rproj
+# in RStudio does this automatically), e.g.:
+#   setwd("/path/to/Quantification_of_PTMs_2026")
 source("MainManuscript/CustomScripts.R")
 
 # ── Data Paths ────────────────────────────────────────────────────────────────
@@ -424,3 +427,40 @@ write.table(test, "Data/ModDiscordant_withCat_breakdown.tsv", sep = "\t", row.na
 protein_cats <- discordant_category_summary(table_protein_diverse, table_occ, min_peptides = 20)
 protein_cats$pct_mod <-  (protein_cats$`Enzymatic Mod` + protein_cats$`Non-Enzymatic Mod` + protein_cats$Carboxymethylation) /
  (protein_cats$Unmodified + protein_cats$Carbamidomethylation +protein_cats$`Enzymatic Mod` + protein_cats$`Non-Enzymatic Mod` + protein_cats$Carboxymethylation)
+
+
+# ── Figure 4 | Modified-Peptide Annotation for Protein-Level Plots ───────────
+# Classify every quantified peptide, then count per gene the peptides that carry
+# a diverse-search-specific modification (enzymatic, carboxymethylation, or other
+# non-enzymatic — excluding mods a limited search would also have found). These
+# objects feed the Figure 4 comparison plots in plotting.R.
+pep_classified <- y.peptide$genes %>%
+  mutate(
+    AllMod   = GetModsTextWReplacement(PeptideSequence, all_mods = TRUE) %>% sapply(paste),
+    Category = ClassifyPeptideModsSpecific(AllMod),
+    Category = ifelse(
+      Category == "Non-Enzymatic Mod" &
+        IsLimitedSearchPeptide(GetMods(PeptideSequence)),
+      "Limited-Search Mod",
+      Category
+    )
+  )
+
+n_mod_strict <- pep_classified %>%
+  filter(Category %in% c("Enzymatic Mod", "Carboxymethylation", "Non-Enzymatic Mod")) %>%
+  group_by(Gene) %>%
+  summarise(n_mod = n(), .groups = "drop")
+
+genes_with_diverse_mods <- n_mod_strict %>% filter(n_mod >= 1) %>% pull(Gene)
+
+# Per-gene discordance table: pairs the diverse-vs-limited logFC/p-value
+# differences with the modified-peptide count. Restricted (via protein_cats) to
+# proteins with > 20 peptides and (via n_mod) to those carrying >= 1 modified peptide.
+pc_for_plot <- protein_cats %>%
+  inner_join(n_mod_strict, by = "Gene") %>%
+  inner_join(
+    merged_pro[, c("Gene", "LogFC_Diff", "ModDiff", "adj.P.Val", "adj.P.Val_NoMod", "logFC_NoMod")],
+    by = "Gene"
+  ) %>%
+  filter(n_mod >= 1) %>%
+  mutate(p_diff = -log10(adj.P.Val) - (-log10(adj.P.Val_NoMod)))

@@ -1,54 +1,95 @@
-# Quantification_of_PTMs_2026
+# Quantification of PTMs in Single-Cell Proteomics
 
-Code companion for: **Improved discovery and quantification of post-translational modifications in single-cell proteomics**
+Code companion to **_Improved discovery and quantification of post-translational modifications in
+single-cell proteomics_** — an R-based re-analysis of single-cell proteomics data from ALS
+(amyotrophic lateral sclerosis) motor neurons
+([original dataset](https://doi.org/10.1016/j.celrep.2023.113636)).
 
-R-based re-analysis of single-cell proteomics data from ALS (Amyotrophic Lateral Sclerosis) motor neurons, original publication [here](https://doi.org/10.1016/j.celrep.2023.113636)
+📖 **Walkthrough / pipeline tutorial:** <https://alexander-sol.github.io/Quantification_of_PTMs_2026/>
+
+The site walks through the entire workflow — from raw spectra to publication figures — so the
+analysis can be reproduced or adapted to a new dataset.
+
+## Pipeline
+
+| Step | Tool | Purpose |
+|------|------|---------|
+| 1 | **MetaMorpheus** | Peptide/protein identification + PTM discovery (GPTMD) |
+| 2 | **FlashLFQ + PIP-ECHO** | Label-free quantification with FDR-controlled match-between-runs |
+| 3 | **limpa** | Dropout-curve modeling, protein summarization, probabilistic imputation |
+| 4 | **R (limma / tidyverse)** | Differential abundance, PTM-occupancy analysis, figures |
+
+Two parallel searches are compared throughout:
+
+- **Diverse PTMs** — GPTMD + search against the UniProt human XML, allowing a broad PTM panel.
+- **Limited PTMs** — GPTMD + search against the UniProt human FASTA, restricted to three variable
+  modifications (deamidation, pyroglutamate, oxidation of methionine).
+
+## Repository structure
+
+```
+├── MainManuscript/
+│   ├── CustomScripts.R              # Data loading, cleaning, PTM parsing, metadata helpers
+│   ├── analysis.R                   # Differential abundance + PTM analyses (run first)
+│   ├── plotting.R                   # Publication figures (run after analysis.R)
+│   ├── ptm_occupancy.R              # Alternative occupancy approach (protein-normalized)
+│   ├── supplemental_ptm_diversity.R # Exports the full PTM-diversity supplemental table
+│   ├── cache/                       # Cached intermediate objects (speed-ups)
+│   └── extras/                      # Utilities NOT part of the core pipeline (see note below)
+├── Supplemental/
+│   ├── analysis.R                   # Supplementary analyses (needs MainManuscript objects)
+│   └── plotting.R                   # Supplementary figures
+├── Data/
+│   ├── DiversePtms/ , LimitedPtms/  # FlashLFQ QuantifiedPeptides/Proteins (LFS)
+│   ├── SequencePositionTable.tsv    # Peptide → sequence-position lookup
+│   └── cache_*.rds                  # Cached EList / dpc objects (LFS)
+├── site/                            # Quarto source for the walkthrough website
+└── Quantification_of_PTMs.Rproj     # Open in RStudio to set the working directory
+```
+
+`MainManuscript/extras/` contains real but non-core utilities (`peptide_explorer.R`,
+`spectrum_viewer.R`, `ProteinHclustExport.R`). They are **not** part of the reproducible pipeline:
+they require either local raw spectra (e.g. `.mzML` files) or a separate code repository, and are
+kept for reference only.
 
 ## Dependencies
 
-- **limpa**: Dropout curve modeling and differential expression (`dpc()`, `dpcQuant()`, `dpcDE()`)
-- **limma**: Linear models for differential abundance
-- **tidyverse / ggplot2**: Data manipulation and visualization
+- R ≥ 4.3 with **limpa** (Bioconductor), **limma**, and **tidyverse**
+- Plotting also uses **cowplot**, **scales**, **ggrepel**, and **eulerr**
+- `supplemental_ptm_diversity.R` additionally uses **writexl**
 
-## Repository Structure
+## Reproducing the analysis
 
+1. **Clone with [Git LFS](https://git-lfs.com)** installed (the large `.tsv`/`.rds` files are tracked
+   via LFS):
+   ```bash
+   git lfs install
+   git clone https://github.com/Alexander-Sol/Quantification_of_PTMs_2026.git
+   ```
+2. **Open `Quantification_of_PTMs.Rproj` in RStudio.** This sets the working directory to the repo
+   root, which every script assumes. (If running outside RStudio, `setwd()` to the repo root first.)
+3. **Run the analysis:**
+   ```r
+   source("MainManuscript/analysis.R")   # builds analysis objects (uses Data/ cache if present)
+   source("MainManuscript/plotting.R")   # writes figures to MainManuscript/Figures/
+   ```
+
+Steps 1–3 of the pipeline (MetaMorpheus → FlashLFQ → limpa) operate on raw spectra that are **not**
+redistributed here. The FlashLFQ quantification tables that the R analysis consumes are included
+under `Data/`. To regenerate them from raw data, follow the
+[walkthrough](https://alexander-sol.github.io/Quantification_of_PTMs_2026/).
+
+> **Note:** Figure 1 and the modification breakdowns read the raw MetaMorpheus `AllPSMs.psmtsv` /
+> `AllPeptides.psmtsv` files (git-ignored). Copy your local search results into
+> `Data/DiversePtms/` and `Data/LimitedPtms/` to regenerate those panels.
+
+## The walkthrough website
+
+The site under `site/` is a [Quarto](https://quarto.org) project. A GitHub Actions workflow
+(`.github/workflows/publish.yml`) renders it and publishes to the `gh-pages` branch on every push.
+To enable hosting once, set **Settings → Pages → Source** to the `gh-pages` branch. To preview
+locally:
+
+```bash
+quarto preview site
 ```
-├── Supplemental/
-│   └── CustomScripts.R           # Data loading, cleaning, PTM parsing, and metadata functions
-├── Tdp43_Stratified/
-│   ├── PublicationWorkflow.R     # Primary analysis: PTM analysis, protein DA, figures 2–4
-│   ├── LimmaProteinWorkflow.R    # Limma-based protein-level differential abundance
-│   ├── LimpaProteinWorkflow.R    # Limpa-based protein-level differential abundance
-│   ├── SequencePositionTable.tsv # Reference table mapping peptides to sequence positions
-│   └── QuantData/
-│       ├── DiversePtms/
-│       │   ├── QuantifiedPeptides.tsv   # FlashLFQ+PIP-ECHO output (diverse PTM search); LFS
-│       │   └── QuantifiedProteins.tsv  # Protein-level quantification
-│       └── LimitedPtms/
-│           ├── QuantifiedPeptides.tsv   # FlashLFQ+PIP-ECHO output (limited PTM search); LFS
-│           └── QuantifiedProteins.tsv  # Protein-level quantification
-└── Stratified_PSMs_mod_vs_nomod.R    # Figure 1: PSM and peptide counts across search strategies
-```
-
-## Data
-
-Input data (raw `.psmtsv` /  files from MetaMorpheus) resides on the Smith lab network, will be added to git LFS shortly.
-`\\bison.chem.wisc.edu\share\Projects\Kelly_ALS_motor_nueron_dataset\`
-
-The `QuantData/` files in this repo are the pre-processed FlashLFQ outputs used as direct inputs to the R analysis scripts. The large `QuantifiedPeptides.tsv` files are stored via Git LFS.
-
-## Usage
-
-Open the project in RStudio. Scripts source helper functions relatively:
-
-```r
-source("../Supplemental/CustomScripts.R")
-```
-
-Run `PublicationWorkflow.R` for the primary PTM and protein-level analysis. Run `Stratified_PSMs_mod_vs_nomod.R` for Figure 1 (update the `psmtsv` paths to point to your local copies of the MetaMorpheus search results).
-
-## Dataset
-
-~100 single motor neurons stratified by TDP-43 pathology severity (CTL / NON / MLD / MOD / SEV), from 5 post-mortem donors. Two parallel searches:
-- **DiversePtms**: GPTMD+Search using the UniProt human XML allowing a broad set of PTMs
-- **LimitedPtms**: GPTMD+Search  using the UniProt human fasta restricted to 3 variable PTMs (Deamidation, pyroglutamate, oxidation of methionine) 

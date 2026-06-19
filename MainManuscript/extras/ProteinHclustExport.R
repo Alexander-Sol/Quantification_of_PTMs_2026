@@ -1,14 +1,20 @@
 # Protein-specific peptide heatmap export (DiffSplice → JavaTreeView)
 #
-# Assumes y.peptide and y.protein EList objects are already in the environment.
-# Set the parameters below, then run the whole script.
+# NOTE: extra / non-core utility. This script is NOT part of the reproducible
+# manuscript pipeline. It assumes y.peptide and y.protein EList objects are
+# already in the environment (run MainManuscript/analysis.R first) and it
+# depends on two helper files from a separate repository
+# (github.com/Alexander-Sol/AlsMotorNeuronAnalysis) that are not included here.
+# Update the two source() paths below to point at your local checkout.
+# Set the working directory to the repository root before running.
 
 library(tidyverse)
 library(limpa)
 
-source("C:/Users/Alex/Source/Repos/Quantification_of_PTMs_2026/MainManuscript/CustomScripts.R")
-source("C:/Users/Alex/Source/Repos/AlsMotorNeuronAnalysis/Supplemental/topSplice.R")
-source("C:/Users/Alex/Source/Repos/AlsMotorNeuronAnalysis/Tdp43_Stratified/HclustExport.R")
+source("MainManuscript/CustomScripts.R")
+# External dependencies — edit to your local AlsMotorNeuronAnalysis checkout:
+source("../AlsMotorNeuronAnalysis/Supplemental/topSplice.R")
+source("../AlsMotorNeuronAnalysis/Tdp43_Stratified/HclustExport.R")
 
 # ── Parameters ────────────────────────────────────────────────────────────────
 

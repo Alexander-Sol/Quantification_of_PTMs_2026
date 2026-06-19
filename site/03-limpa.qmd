@@ -1,0 +1,68 @@
+---
+title: "3 · Modeling with limpa"
+---
+
+[limpa](https://www.bioconductor.org/packages/release/bioc/html/limpa.html) models the
+**dropout curve** — the relationship between a peptide's underlying abundance and its probability
+of being missing — then uses it to summarize peptides into proteins and to impute missing values
+in a way that respects that missingness mechanism. This is what makes a principled differential
+analysis possible on sparse single-cell data.
+
+## Installation
+
+```r
+# Bioconductor
+if (!require("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install("limpa")
+```
+
+## From quantification table to `EList`
+
+limpa works on a limma-style `EList` with three parts: an expression matrix (`E`), a peptide/gene
+annotation table (`genes`), and a sample metadata table (`targets`). In this project those are
+built from the FlashLFQ `QuantifiedPeptides.tsv` by helper functions in
+`MainManuscript/CustomScripts.R`:
+
+```r
+library(limpa)
+source("MainManuscript/CustomScripts.R")
+
+df   <- read.csv("Data/DiversePtms/QuantifiedPeptides.tsv", sep = "\t", row.names = NULL)
+df   <- df[grepl("Homo sapiens", df$Organism), ]
+df   <- CleanAmbiguousPeptides(df)          # resolve human/contaminant ambiguity
+
+intensity_cols <- grep("^Intensity_", colnames(df), value = TRUE)
+expr    <- GetExpressionMatrix(df, intensity_cols)   # log2, zeros -> NA
+genes   <- GetGeneTable(df)                          # PeptideSequence / BaseSequence / ProteinGroup / Gene
+targets <- GetMetaDataTdpStratified(expr)            # Group / TDP_Lvl / Donor / PMI / Age / Sex
+
+y.peptide <- structure(list(E = expr, genes = genes, targets = targets), class = "EList")
+```
+
+## Dropout-curve modeling, summarization, and imputation
+
+```r
+# 1. Fit the dropout curve
+dpcfit <- dpc(y.peptide)
+plotDPC(dpcfit)
+
+# 2. Summarize peptides to proteins (information-aware)
+y.protein <- dpcQuant(y.peptide, "ProteinGroup", dpc = dpcfit, verbose = TRUE)
+
+# 3. Impute peptide-level missing values for occupancy analysis
+y.peptide.imputed <- dpcImpute(y.peptide, "PeptideSequence", dpc = dpcfit, verbose = TRUE)
+```
+
+`dpcQuant()` propagates per-measurement standard errors into `y.protein$other$standard.error`,
+which the PTM-occupancy analysis later combines when normalizing modified peptides to their parent
+protein.
+
+::: {.callout-note}
+These steps are slow. `MainManuscript/analysis.R` caches `y.peptide`, `dpcfit`, `y.protein`, and
+`y.peptide.imputed` as `.rds` files in `Data/`; delete those cache files to force a full rerun.
+:::
+
+> **Paper:** [*Quantification and differential analysis of mass spectrometry proteomics data with
+> probabilistic recovery of information from missing values*](https://www.biorxiv.org/content/10.1101/2025.04.28.651125v1.full)
+
+Next: [Downstream R analysis & figures →](04-r-analysis.qmd)

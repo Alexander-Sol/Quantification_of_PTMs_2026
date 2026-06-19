@@ -9,3 +9,14 @@ Supplemental/Figures/
 .Rhistory
 .RData
 .Rproj.user/
+
+# Quarto site build output
+site/_site/
+site/.quarto/
+
+# Word lock/temp files
+~WRL*.tmp
+~$*.docx
+
+# Supplemental data tables — too large for git; uploaded separately as SI
+*.xlsx

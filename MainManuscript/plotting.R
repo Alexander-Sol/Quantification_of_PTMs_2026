@@ -386,7 +386,7 @@ p_fig3_volcano <- ggplot(volcano_df, aes(x = logFC, y = y_display)) +
     plot.title  = element_text(size = 14 * TEXT_SIZE),
     axis.title  = element_text(size = 12 * TEXT_SIZE),
     axis.text   = element_text(size = 11 * TEXT_SIZE),
-    legend.position      = c(0.46, 0.98),
+    legend.position      = c(0.425, 0.98),
     legend.justification = c(0.5, 1),
     legend.background    = element_rect(fill = alpha("white", 0.6), color = NA),
     legend.text          = element_text(size = 11 * TEXT_SIZE),
@@ -395,7 +395,7 @@ p_fig3_volcano <- ggplot(volcano_df, aes(x = logFC, y = y_display)) +
   ) +
   guides(color = guide_legend(order = 1, reverse = TRUE, override.aes = list(size = 3.5)),
          shape = guide_legend(order = 2, override.aes = list(size = 3.5)))
-p_fig3_volcano
+#p_fig3_volcano
 
 ggsave(file.path(FIG_DIR, "Fig3_Volcano.png"), p_fig3_volcano, width = 8.5, height = 6, dpi = 300)
 
