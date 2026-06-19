@@ -3,7 +3,10 @@
 Code companion to **_Improved discovery and quantification of post-translational modifications in
 single-cell proteomics_** — an R-based re-analysis of single-cell proteomics data from ALS
 (amyotrophic lateral sclerosis) motor neurons
-([original dataset](https://doi.org/10.1016/j.celrep.2023.113636)).
+([original publication](https://doi.org/10.1016/j.celrep.2023.113636)).
+
+
+Original dataset can be found here: [PXD042799](http://proteomecentral.proteomexchange.org/cgi/GetDataset?ID=PXD042799)
 
 **Walkthrough / pipeline tutorial:** <https://alexander-sol.github.io/Quantification_of_PTMs_2026/>
 
